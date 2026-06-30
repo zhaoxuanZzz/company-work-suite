@@ -6,4 +6,23 @@ requires_env:
   - name: QCC_MCP_TOKEN
     description: Token for Qichacha MCP access.
     secret: true
+mcp_servers:
+  qcc-company:
+    type: http
+    url: https://agent.qcc.com/mcp/company/stream
+  qcc-risk:
+    type: http
+    url: https://agent.qcc.com/mcp/risk/stream
+  qcc-ipr:
+    type: http
+    url: https://agent.qcc.com/mcp/ipr/stream
+  qcc-operation:
+    type: http
+    url: https://agent.qcc.com/mcp/operation/stream
+  qcc-executive:
+    type: http
+    url: https://agent.qcc.com/mcp/executive/stream
+  qcc-history:
+    type: http
+    url: https://agent.qcc.com/mcp/history/stream
 provides_skills: [noetic-company-basic-info, noetic-company-profile, noetic-due-diligence, noetic-financing-history, noetic-investment-analysis, noetic-karpathy-llm-wiki, noetic-litigation-risk, noetic-shareholder-structure]
