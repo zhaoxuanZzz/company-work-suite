@@ -2,7 +2,7 @@
 
 > 版本：v0.2 · 更新日期：2026-06-28  
 > 目标：将 noeticai 企业知识卡片整理为 Hermes、Codex、Qoder 等平台兼容的 skills 插件。  
-> 原则：卡片独立、入口 skill 内部 workflow 显式编排、产物协议可检查、暂不实现 runner。
+> 原则：卡片独立、入口 skill 内部 workflow 显式编排、产物由 card.yaml 定义、暂不实现 runner。
 
 ## 1. 背景与目标
 
@@ -16,8 +16,7 @@ noeticai 现有知识卡片具备两类能力：
 - 每张卡片都是独立 `skill`
 - 业务入口如 `企业尽调`、`投资分析` 也是独立 `skill`
 - 业务顺序放入入口 skill 的 `references/workflow.yaml`
-- stage 间产物由 `artifact-contracts/*.yaml` 描述
-- 结果检查目标由 `quality-gates/*.yaml` 描述
+- 产物结构与质量约束由各 skill 的 `card.yaml` 和 `SKILL.md` 表达
 - `.mcp.json` 只作为跨平台 companion 配置
 
 不在本阶段实现 workflow runtime、数据库 schema 迁移或 MCP 工具名自动映射。
@@ -34,16 +33,6 @@ noeticai-knowledge/
 ├── README.md
 ├── README_EN.md
 ├── CONNECTORS.md
-├── artifact-contracts/
-│   ├── company_profile.yaml
-│   ├── shareholder_structure.yaml
-│   ├── litigation_risk.yaml
-│   ├── financing_history.yaml
-│   ├── due_diligence_report.yaml
-│   └── investment_analysis_report.yaml
-├── quality-gates/
-│   ├── evidence_coverage.yaml
-│   └── no_fabricated_data.yaml
 └── skills/
     ├── noetic-company-profile/
     │   ├── SKILL.md
@@ -89,7 +78,7 @@ noeticai-knowledge/
 }
 ```
 
-Workflow 自定义语义不写入 `plugin.json`；workflow 放在入口 skill 的 `references/workflow.yaml`，artifact contract 和 quality gate 使用独立 YAML 文件表达。
+Workflow 自定义语义不写入 `plugin.json`；workflow 放在入口 skill 的 `references/workflow.yaml`。
 
 ## 4. 单卡设计
 
@@ -144,7 +133,6 @@ stages:
     skills: [noetic-due-diligence]
     inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
     outputs: [due_diligence_report]
-    quality_gates: [evidence_coverage, no_fabricated_data]
 ```
 
 `report` stage 使用入口 `企业尽调` skill。前置画像、股权、司法和融资阶段由该 skill 的 workflow 显式编排。
@@ -172,8 +160,6 @@ data_needs:
 - `python3 scripts/validate_work_suite.py .` 通过
 - 宿主 manifest 存在且名称一致
 - workflow 位于入口 skill 的 `references/workflow.yaml`
-- workflow 输出都有对应 artifact contract
-- workflow quality gate 都有对应 YAML
 - 企业画像、股权结构分析、司法风险分析、融资历史分析、企业尽调和投资分析可作为独立 skill 被触发
 
 ## 8. 暂不实现

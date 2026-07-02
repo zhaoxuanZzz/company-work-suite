@@ -56,8 +56,6 @@ See [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-pl
 ├── .codex-plugin/plugin.json
 ├── .claude-plugin/plugin.json
 ├── .mcp.json
-├── artifact-contracts/*.yaml
-├── quality-gates/*.yaml
 ├── skills/{skill-name}/SKILL.md
 ├── skills/{skill-name}/card.yaml
 ├── skills/{entry-skill}/references/workflow.yaml

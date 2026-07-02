@@ -14,4 +14,3 @@ stages:
     skills: [noetic-due-diligence]
     inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
     outputs: [due_diligence_report]
-    quality_gates: [evidence_coverage, no_fabricated_data]

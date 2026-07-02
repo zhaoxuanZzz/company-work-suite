@@ -58,7 +58,7 @@ def parse_workflow(path: Path) -> list[dict[str, object]]:
 
         if indent == 4 and ":" in line and stages:
             key, value = [part.strip() for part in line.split(":", 1)]
-            if key in {"skills", "inputs", "outputs", "quality_gates"}:
+            if key in {"skills", "inputs", "outputs"}:
                 stages[-1][key] = parse_inline_list(value, path, line_no)
             elif key == "parallel":
                 if value not in {"true", "false"}:
@@ -75,12 +75,6 @@ def parse_workflow(path: Path) -> list[dict[str, object]]:
     if not stages:
         raise WorkSuiteError(f"{path}: stages is required")
     return stages
-
-
-def yaml_names(directory: Path) -> set[str]:
-    if not directory.exists():
-        return set()
-    return {path.stem for path in directory.glob("*.yaml")}
 
 
 def read_json(path: Path, errors: list[str]) -> dict[str, object] | None:
@@ -200,8 +194,6 @@ def validate_hermes(root: Path) -> list[str]:
 def validate_work_suite(root: Path) -> list[str]:
     errors: list[str] = []
     skills_dir = root / "skills"
-    artifact_names = yaml_names(root / "artifact-contracts")
-    gate_names = yaml_names(root / "quality-gates")
     names = skill_names(root, errors)
 
     for workflow in sorted(skills_dir.glob("*/references/workflow.yaml")):
@@ -223,13 +215,7 @@ def validate_work_suite(root: Path) -> list[str]:
                     errors.append(f"{workflow}: stage {stage_id}: input '{artifact}' is not produced by a previous stage")
 
             for artifact in stage.get("outputs", []):
-                if artifact not in artifact_names:
-                    errors.append(f"{workflow}: stage {stage_id}: missing artifact-contracts/{artifact}.yaml")
                 available_outputs.add(artifact)
-
-            for gate in stage.get("quality_gates", []):
-                if gate not in gate_names:
-                    errors.append(f"{workflow}: stage {stage_id}: missing quality-gates/{gate}.yaml")
 
             if "skills" not in stage:
                 errors.append(f"{workflow}: stage {index} ({stage_id}): skills is required")
@@ -264,8 +250,6 @@ def make_suite(root: Path) -> None:
     write(root / "plugin.yaml", f"name: {root.name}\nversion: 0.1.0\ndescription: Test plugin\n")
     write(root / "__init__.py", "def register(ctx):\n    ctx.register_skill('research', 'skills/research/SKILL.md')\n")
     write(root / "skills" / "research" / "SKILL.md")
-    write(root / "artifact-contracts" / "context.yaml")
-    write(root / "quality-gates" / "coverage.yaml")
     write(
         root / "skills" / "research" / "references" / "workflow.yaml",
         """name: OK
@@ -273,7 +257,6 @@ stages:
   - id: research
     skills: [research]
     outputs: [context]
-    quality_gates: [coverage]
 """,
     )
 
@@ -312,14 +295,6 @@ stages:
 """,
         )
         assert any("is not produced by a previous stage" in error for error in validate(bad_input))
-
-        missing_contracts = base / "missing-contracts"
-        make_suite(missing_contracts)
-        (missing_contracts / "artifact-contracts" / "context.yaml").unlink()
-        (missing_contracts / "quality-gates" / "coverage.yaml").unlink()
-        errors = validate(missing_contracts)
-        assert any("missing artifact-contracts/context.yaml" in error for error in errors)
-        assert any("missing quality-gates/coverage.yaml" in error for error in errors)
 
     print("self-test ok")
     return 0

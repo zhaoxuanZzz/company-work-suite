@@ -14,4 +14,3 @@ stages:
     skills: [noetic-investment-analysis]
     inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
     outputs: [investment_analysis_report]
-    quality_gates: [evidence_coverage, no_fabricated_data]

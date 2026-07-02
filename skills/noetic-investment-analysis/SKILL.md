@@ -12,10 +12,11 @@ argument-hint: "输入公司名称，如：杭州XX科技有限公司"
 ## 执行规则
 
 1. 前置输入必须包含 `company_profile`、`shareholder_structure`、`litigation_risk` 和 `financing_history`。
-2. 如果前置产物缺失，先执行 `references/workflow.yaml` 的对应阶段。
-3. 只综合已有证据与明确标注的数据缺口，不要编造工商、司法、股权、融资、估值或投资结论。
-4. 输出必须覆盖 `artifact-contracts/investment_analysis_report.yaml` 的 required_fields。
-5. 结论必须标注依据来源、数据时间和 `evidence_gaps`。
+2. 如果在对话中直接触发且前置产物缺失，必须改用 `/noetic-workflow` 执行 `references/workflow.yaml`，不要在本 skill 内串行执行前置卡片。
+3. 只有在 workflow 最终报告任务中，或用户已经提供完整前置产物时，才生成最终投资研判。
+4. 只综合已有证据与明确标注的数据缺口，不要编造工商、司法、股权、融资、估值或投资结论。
+5. 输出必须覆盖 `card.yaml` 的 `outputs` 字段。
+6. 结论必须标注依据来源、数据时间和 `evidence_gaps`。
 
 ## 输出格式
 

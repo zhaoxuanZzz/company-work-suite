@@ -56,8 +56,6 @@ python3 scripts/validate_work_suite.py .
 ├── .claude-plugin/plugin.json   # Claude/Hermes 兼容 manifest
 ├── .codex-plugin/plugin.json    # Codex 兼容 manifest
 ├── .mcp.json                    # MCP companion 配置
-├── artifact-contracts/*.yaml    # skill workflow 产物协议
-├── quality-gates/*.yaml         # skill workflow 质量门禁
 ├── skills/
 │   ├── {skill-name}/SKILL.md        # 卡片执行说明
 │   ├── {skill-name}/card.yaml       # 卡片结构化元数据

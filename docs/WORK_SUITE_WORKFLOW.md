@@ -4,9 +4,9 @@
 
 ## 目标与非目标
 
-插件是面向企业研究的专家包，包含原子 skill、入口 skill、入口 skill 内部 workflow、产物协议和质量门禁。它建立在多平台 skills plugin 结构之上，不替代各宿主需要的 manifest。
+插件是面向企业研究的专家包，包含原子 skill、入口 skill、入口 skill 内部 workflow。它建立在多平台 skills plugin 结构之上，不替代各宿主需要的 manifest。
 
-首版只定义目录、静态引用和人工可读语义，不实现 workflow runner，不新增数据库模型，不改知识卡片执行链路。
+首版只定义目录、静态引用和人工可读语义，不实现 workflow runner，不新增数据库模型，不改知识卡片执行链路。产物结构与质量约束由各 skill 的 `card.yaml` 和 `SKILL.md` 表达，不在本仓库做独立 eval。
 
 ## 标准目录结构
 
@@ -25,10 +25,6 @@
       scripts/
       assets/
       tests/
-  artifact-contracts/
-    <artifact-name>.yaml
-  quality-gates/
-    <gate-name>.yaml
   assets/
   README.md
 ```
@@ -44,7 +40,7 @@
 - 外部系统能力由 MCP/plugin 既有机制提供，Work Suite 不另行定义连接协议。
 - 跨 skill 复用资料应优先收口到拥有该职责的 skill；只有真正跨职责复用的资料才单独建共享目录。
 - `tests/` 只放对应 skill 的轻量验证。
-- v1 校验只检查静态引用：plugin 名称、skill 目录、skill workflow 引用的 artifact contract 和 quality gate 是否存在。
+- v1 校验只检查静态引用：plugin 名称、skill 目录、workflow 的 skill 引用与 inputs/outputs 依赖关系。
 
 ## 概念边界
 
@@ -54,10 +50,12 @@
 | 原子 Skill | 单项能力，例如企业画像、司法风险分析 |
 | 入口 Skill | 可被用户直接触发的业务能力，例如企业尽调、投资分析 |
 | Skill Workflow | 入口 skill 内部显式编排多个 skill 的 stage、前置、并行、产物传递 |
-| Artifact Contract | stage 间传递的结构化产物协议 |
-| Quality Gate | 对 artifact 或最终结果描述人工或脚本可读的检查目标 |
+| Artifact | stage 间传递的结构化产物名称；具体字段由各 skill 的 `card.yaml` 定义 |
+| `/noetic-workflow` | Noetic workflow 的规范解释、创建辅助和执行入口；支持 `planned`（静态 workflow.yaml）与 `auto`（Hermes triage 自动拆图）两种执行模式 |
 
 核心原则：采用入口 skill 内部 workflow 显式表达业务顺序。Skill 可以描述输入、输出、触发条件和失败条件，但 v1 只把这些内容作为静态约定。
+
+`/noetic-workflow` 是通用管理入口：它可以解释 workflow 规范、辅助创建 `references/workflow.yaml`，并把入口 skill 的 workflow 提交到当前试行执行层。执行时用户可选择 **planned**（按 `workflow.yaml` 确定性编排）或 **auto**（提交 Hermes triage 卡由 `kanban_decomposer` 自动拆图）。入口报告 skill 不应在缺少前置产物时自行串行调用前置卡片，而应转交 `/noetic-workflow` 执行对应 workflow。
 
 ## Workflow YAML 最小语义
 
@@ -78,11 +76,6 @@ stages:
     skills: [评级报告]
     inputs: [context_pack, working_paper, evidence_records]
     outputs: [rating_report]
-
-  - id: review
-    skills: [评级委员会材料]
-    inputs: [rating_report, evidence_records]
-    quality_gates: [evidence_coverage, methodology_consistency]
 ```
 
 字段约定：
@@ -94,33 +87,8 @@ stages:
 - `stages[].inputs`：本阶段消费的 artifacts，只能引用前序阶段声明过的 outputs。
 - `stages[].outputs`：本阶段产出的 artifacts。
 - `stages[].parallel`：说明本阶段内 skills 在业务上互不依赖；v1 不承诺执行行为。
-- `stages[].quality_gates`：本阶段完成后应检查的质量门禁。
 
-v1 校验脚本只支持上述 YAML 子集，尤其是 `skills`、`inputs`、`outputs`、`quality_gates` 使用行内数组写法，例如 `[context_pack, working_paper]`。复杂 YAML 写法应先转成这个最小形态。
-
-## Contract 示例
-
-Artifact Contract 只描述产物形状和验收含义，不绑定具体执行代码，也不要求 runner 消费。
-
-```yaml
-name: working_paper
-description: 评级分析工作底稿
-required_fields:
-  - issuer_profile
-  - financial_analysis
-  - peer_comparison
-  - evidence_records
-```
-
-Quality Gate 描述人工或脚本可读的检查目标和输入，不负责业务流程编排，也不绑定 EvalAgent。
-
-```yaml
-name: evidence_coverage
-inputs: [rating_report, evidence_records]
-checks:
-  - every_key_claim_has_evidence
-  - evidence_source_is_traceable
-```
+v1 校验脚本只支持上述 YAML 子集，尤其是 `skills`、`inputs`、`outputs` 使用行内数组写法，例如 `[context_pack, working_paper]`。复杂 YAML 写法应先转成这个最小形态。
 
 ## 与知识卡片调用机制的映射
 
@@ -130,7 +98,6 @@ checks:
 | 子卡片输出 | artifact |
 | `task_relations` | workflow stage graph |
 | `caller_session_id` | 后续 runner 可参考的 run/parent id |
-| EvalAgent | 后续 runner 可参考的 quality gate 执行方式 |
 
 这只是架构映射，不要求 skill workflow 复用现有知识卡片执行器。后续如实现 runner，应优先保留这些可观测性和防循环能力。
 
@@ -148,8 +115,6 @@ python3 scripts/validate_work_suite.py <plugin-root>
 - `skills/*/SKILL.md` 存在。
 - `skills/*/references/workflow.yaml` 的 `stages[].skills` 引用已有 skill 目录名。
 - `stages[].inputs` 只能引用前序 stage 声明过的 `outputs`。
-- `stages[].outputs` 必须存在对应 `artifact-contracts/<name>.yaml`。
-- `stages[].quality_gates` 必须存在对应 `quality-gates/<name>.yaml`。
 
 ## 示例套件
 
@@ -164,20 +129,12 @@ credit-rating-analyst/
     peer-comparison/SKILL.md
     compliance-due-diligence/SKILL.md
     rating-report/SKILL.md
-    committee-material/SKILL.md
     initial-rating/
       SKILL.md
       references/workflow.yaml
-  artifact-contracts/
-    context-pack.yaml
-    working-paper.yaml
-    rating-report.yaml
-  quality-gates/
-    evidence-coverage.yaml
-    methodology-consistency.yaml
 ```
 
-这个套件中，入口 skill 是多平台可发现入口；workflow 是入口 skill 内的 SOP；artifact contract 负责上下游数据约束；quality gate 负责评估闭环。
+这个套件中，入口 skill 是多平台可发现入口；workflow 是入口 skill 内的 SOP；各 skill 的 `card.yaml` 负责产物字段约束。
 
 ## 评审场景
 
@@ -186,6 +143,5 @@ credit-rating-analyst/
 - 单 stage 单 skill：能表达最简单任务。
 - 多 stage 前置依赖：后续 stage 能消费前置 artifact。
 - stage 内多 skill：能表达未来并行。
-- review stage：能挂 quality gate。
 
 本规范只要求上述静态校验通过；不引入 runner。
