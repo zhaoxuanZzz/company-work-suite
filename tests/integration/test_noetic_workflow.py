@@ -71,6 +71,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
         result = run_command(
             str(SCRIPT),
             "execute",
+            "--mode",
+            "planned",
             "--skill",
             "noetic-due-diligence",
             "--company",
@@ -116,6 +118,29 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
         )
         self.assertNotIn("hermes kanban create", result.stdout)
 
+    def test_delegate_mode_outputs_subagent_plan_without_hermes_commands(self) -> None:
+        result = run_command(
+            str(SCRIPT),
+            "execute",
+            "--mode",
+            "delegate",
+            "--skill",
+            "noetic-due-diligence",
+            "--company",
+            "杭州XX科技有限公司",
+            "--workspace",
+            "dir:/tmp/noetic-run",
+        )
+        graph = json.loads(result.stdout)
+
+        self.assertEqual("delegate", graph["mode"])
+        self.assertEqual("noetic-due-diligence", graph["skill"])
+        self.assertEqual(5, len(graph["nodes"]))
+        self.assertEqual("noetic-company-profile", graph["nodes"][0]["skill"])
+        self.assertIn("执行 Noetic 知识卡片：noetic-company-profile", graph["nodes"][0]["prompt"])
+        self.assertEqual(["task1", "task2", "task3", "task4"], graph["nodes"][4]["parents"])
+        self.assertNotIn("hermes kanban create", result.stdout)
+
     def test_real_company_names_dry_run_for_all_entry_workflows(self) -> None:
         for company in real_companies():
             for skill in ("noetic-due-diligence", "noetic-investment-analysis"):
@@ -123,6 +148,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
                     result = run_command(
                         str(SCRIPT),
                         "execute",
+                        "--mode",
+                        "planned",
                         "--skill",
                         skill,
                         "--company",
@@ -146,6 +173,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             result = run_command(
                 str(SCRIPT),
                 "execute",
+                "--mode",
+                "planned",
                 "--skill",
                 "noetic-investment-analysis",
                 "--company",
@@ -178,6 +207,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             run_command(
                 str(SCRIPT),
                 "execute",
+                "--mode",
+                "planned",
                 "--skill",
                 "noetic-due-diligence",
                 "--company",
@@ -208,6 +239,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
                     result = run_command(
                         str(SCRIPT),
                         "execute",
+                        "--mode",
+                        "planned",
                         "--skill",
                         "noetic-due-diligence",
                         "--company",
@@ -245,6 +278,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
                     sys.executable,
                     str(SCRIPT),
                     "execute",
+                    "--mode",
+                    "planned",
                     "--skill",
                     "noetic-due-diligence",
                     "--company",
@@ -366,7 +401,7 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             self.assertEqual(2, len(calls))
             self.assertEqual(["kanban", "dispatch"], calls[1])
 
-    def test_planned_default_mode_unchanged(self) -> None:
+    def test_delegate_default_mode_outputs_subagent_plan(self) -> None:
         result = run_command(
             str(SCRIPT),
             "execute",
@@ -376,11 +411,13 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             "杭州XX科技有限公司",
             "--workspace",
             "dir:/tmp/noetic-run",
-            "--dry-run",
         )
+        graph = json.loads(result.stdout)
 
-        self.assertIn("Noetic workflow execution plan: noetic-due-diligence (5 tasks)", result.stdout)
-        self.assertEqual(5, result.stdout.count("hermes kanban create"))
+        self.assertEqual("delegate", graph["mode"])
+        self.assertEqual("noetic-due-diligence", graph["skill"])
+        self.assertEqual(5, len(graph["nodes"]))
+        self.assertNotIn("hermes kanban create", result.stdout)
 
     def test_planned_default_workspace_under_noeticai(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -390,6 +427,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             result = run_command(
                 str(SCRIPT),
                 "execute",
+                "--mode",
+                "planned",
                 "--skill",
                 "noetic-due-diligence",
                 "--company",
@@ -440,6 +479,8 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             run_command(
                 str(SCRIPT),
                 "execute",
+                "--mode",
+                "planned",
                 "--skill",
                 "noetic-due-diligence",
                 "--company",

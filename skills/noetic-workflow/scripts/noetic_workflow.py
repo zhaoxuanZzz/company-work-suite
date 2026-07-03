@@ -417,9 +417,11 @@ def profile_create_command(profile: str) -> str:
 
 
 def validate_execute_args(args: argparse.Namespace) -> None:
-    if args.mode == "planned":
+    if args.mode in {"planned", "delegate"}:
         if not args.skill:
-            raise WorkSuiteError("--skill is required for planned mode")
+            raise WorkSuiteError(f"--skill is required for {args.mode} mode")
+        if args.dispatch:
+            raise WorkSuiteError("--dispatch is only supported for auto mode")
         return
     if args.dispatch and not args.apply:
         raise WorkSuiteError("--dispatch requires --apply")
@@ -489,8 +491,38 @@ def command_execute_auto(args: argparse.Namespace) -> int:
     return 0
 
 
+def command_execute_delegate(args: argparse.Namespace) -> int:
+    workspace = resolve_workspace(args.company, args.tenant, args.workspace)
+    tasks = build_task_plan(args.skill, args.company, workspace)
+    graph = {
+        "mode": "delegate",
+        "skill": args.skill,
+        "company": args.company,
+        "workspace": workspace,
+        "instructions": "Delegate ready nodes to subagents. A node is ready when all parent artifacts are available; if subagents are unavailable, run nodes in the current agent in dependency order.",
+        "nodes": [
+            {
+                "id": task.task_id,
+                "stage": task.stage_id,
+                "skill": task.skill,
+                "role": task.assignee,
+                "title": task.title,
+                "parents": task.parents,
+                "outputs": task.outputs,
+                "prompt": task.body,
+            }
+            for task in tasks
+        ],
+        "edges": [{"from": parent, "to": task.task_id} for task in tasks for parent in task.parents],
+    }
+    print(json.dumps(graph, ensure_ascii=False, indent=2))
+    return 0
+
+
 def command_execute(args: argparse.Namespace) -> int:
     validate_execute_args(args)
+    if args.mode == "delegate":
+        return command_execute_delegate(args)
     if args.mode == "auto":
         return command_execute_auto(args)
     return command_execute_planned(args)
@@ -518,7 +550,7 @@ def build_parser() -> argparse.ArgumentParser:
     compile_parser.set_defaults(func=command_compile)
 
     execute = subparsers.add_parser("execute")
-    execute.add_argument("--mode", choices=["planned", "auto"], default="planned")
+    execute.add_argument("--mode", choices=["planned", "auto", "delegate"], default="delegate")
     execute.add_argument("--skill")
     execute.add_argument("--company", required=True)
     execute.add_argument(
