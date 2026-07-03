@@ -17,7 +17,7 @@ Cross-platform skills plugin for Hermes, Codex, Qoder, and compatible hosts. It 
 
 ## Skill Workflows
 
-Business workflows live inside entry skills as `references/workflow.yaml`. Cross-platform skill discovery still starts from `skills/*/SKILL.md`.
+Business workflows live inside orchestrating skills as `references/workflow.yaml`, declaring prerequisite stages and artifact dependencies. Cross-platform skill discovery still starts from `skills/*/SKILL.md`.
 
 | Skill | Workflow |
 |----------|-------------|
@@ -58,6 +58,6 @@ See [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-pl
 ├── .mcp.json
 ├── skills/{skill-name}/SKILL.md
 ├── skills/{skill-name}/card.yaml
-├── skills/{entry-skill}/references/workflow.yaml
+├── skills/{orchestrating-skill}/references/workflow.yaml
 └── scripts/validate_work_suite.py
 ```

@@ -2,7 +2,7 @@
 
 > 版本：v0.2 · 更新日期：2026-06-28  
 > 目标：将 noeticai 企业知识卡片整理为 Hermes、Codex、Qoder 等平台兼容的 skills 插件。  
-> 原则：卡片独立、入口 skill 内部 workflow 显式编排、产物由 card.yaml 定义、暂不实现 runner。
+> 原则：卡片独立、编排型 skill 内部 workflow 显式编排、产物由 card.yaml 定义、暂不实现 runner。
 
 ## 1. 背景与目标
 
@@ -13,9 +13,7 @@ noeticai 现有知识卡片具备两类能力：
 
 本方案将知识卡片迁移为 `noeticai-knowledge` 多平台 skills 插件。迁移后：
 
-- 每张卡片都是独立 `skill`
-- 业务入口如 `企业尽调`、`投资分析` 也是独立 `skill`
-- 业务顺序放入入口 skill 的 `references/workflow.yaml`
+- 每张卡片都是独立 `skill`；需要标准前置流程时，由编排型 skill 的 `references/workflow.yaml` 声明依赖
 - 产物结构与质量约束由各 skill 的 `card.yaml` 和 `SKILL.md` 表达
 - `.mcp.json` 只作为跨平台 companion 配置
 
@@ -78,11 +76,11 @@ noeticai-knowledge/
 }
 ```
 
-Workflow 自定义语义不写入 `plugin.json`；workflow 放在入口 skill 的 `references/workflow.yaml`。
+Workflow 自定义语义不写入 `plugin.json`；workflow 放在编排型 skill 的 `references/workflow.yaml`。
 
 ## 4. 单卡设计
 
-原子卡片保持独立，只声明输入、数据需求、输出和分析规则。入口卡片可以通过 `references/workflow.yaml` 编排前置原子卡片。
+原子卡片保持独立，只声明输入、数据需求、输出和分析规则。编排型卡片可以通过 `references/workflow.yaml` 编排前置原子卡片。
 
 `skills/noetic-shareholder-structure/card.yaml` 示例：
 
@@ -112,7 +110,7 @@ outputs:
 
 ## 5. Workflow 设计
 
-workflow 只负责编排，不承载具体分析逻辑。v1 使用 `docs/WORK_SUITE_WORKFLOW.md` 中定义的最小 YAML 子集，并放在入口 skill 内。
+workflow 只负责编排，不承载具体分析逻辑。v1 使用 `docs/WORK_SUITE_WORKFLOW.md` 中定义的最小 YAML 子集，并放在编排型 skill 内。
 
 `skills/noetic-due-diligence/references/workflow.yaml`：
 
@@ -135,7 +133,7 @@ stages:
     outputs: [due_diligence_report]
 ```
 
-`report` stage 使用入口 `企业尽调` skill。前置画像、股权、司法和融资阶段由该 skill 的 workflow 显式编排。
+`report` stage 使用终端 `企业尽调` skill。前置画像、股权、司法和融资阶段由该 skill 的 workflow 显式编排。
 
 ## 6. 数据与 MCP 接入
 
@@ -159,7 +157,7 @@ data_needs:
 - `python3 scripts/validate_work_suite.py --self-test` 通过
 - `python3 scripts/validate_work_suite.py .` 通过
 - 宿主 manifest 存在且名称一致
-- workflow 位于入口 skill 的 `references/workflow.yaml`
+- workflow 位于编排型 skill 的 `references/workflow.yaml`
 - 企业画像、股权结构分析、司法风险分析、融资历史分析、企业尽调和投资分析可作为独立 skill 被触发
 
 ## 8. 暂不实现

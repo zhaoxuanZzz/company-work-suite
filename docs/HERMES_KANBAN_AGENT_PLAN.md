@@ -4,14 +4,14 @@
 
 ## 结论
 
-`/noetic-workflow` 负责读取入口 skill 的 `references/workflow.yaml`；Hermes Kanban backend 负责把 workflow 变成任务图执行。
+`/noetic-workflow` 负责读取编排型 skill 的 `references/workflow.yaml`；Hermes Kanban backend 负责把 workflow 变成任务图执行。
 
 首版只保留两个 Hermes profile：
 
 | Profile | 用途 | 执行什么 | 不做什么 |
 | --- | --- | --- | --- |
 | `worker` | 执行前置知识卡片 | 企业画像、股权结构、司法风险、融资历史等中间产物卡片 | 不生成最终报告，不把缺失字段补写成确定结论 |
-| `gen` | 生成最终报告 | 企业尽调、投资分析等入口报告卡片 | 不重新取数，不绕过父任务 artifact 补事实 |
+| `gen` | 生成最终报告 | 企业尽调、投资分析等编排型报告卡片 | 不重新取数，不绕过父任务 artifact 补事实 |
 
 不单独拆 `data` 和 `analysis`。现有知识卡片本身已经同时包含数据需求、业务判断和输出格式，强拆会先制造迁移成本。
 
@@ -38,12 +38,12 @@
 - 能判断证据不足，但不能编造工商、司法、股权、融资或估值事实。
 - 同一个 stage 标记 `parallel: true` 时，多个 `worker` task 可以并行运行，但彼此不共享隐式状态，只通过 parent artifact 传递信息。
 
-`gen` 是首版的最终报告 agent。它只处理入口报告卡片，例如 `noetic-due-diligence` 和 `noetic-investment-analysis`。
+`gen` 是首版的最终报告 agent。它只处理编排型报告卡片，例如 `noetic-due-diligence` 和 `noetic-investment-analysis`。
 
 `gen` 的输入：
 
 - 所有父任务 handoff 中的 artifact、来源、数据时间和 `evidence_gaps`。
-- 入口报告 skill 的 `SKILL.md` 和 `card.yaml`。
+- 编排型报告 skill 的 `SKILL.md` 和 `card.yaml`。
 
 `gen` 的输出：
 
@@ -60,9 +60,9 @@
 
 ## 现有卡片结构
 
-当前仓库里的入口卡片：
+当前仓库里的编排型卡片：
 
-| 入口 skill | workflow | 最终产物 |
+| 编排型 skill | workflow | 最终产物 |
 | --- | --- | --- |
 | `noetic-due-diligence` | `skills/noetic-due-diligence/references/workflow.yaml` | `due_diligence_report` |
 | `noetic-investment-analysis` | `skills/noetic-investment-analysis/references/workflow.yaml` | `investment_analysis_report` |
@@ -89,7 +89,7 @@
 | `stages[].outputs[]` | 写入 task body，要求 worker 产出这些 artifact |
 | `parallel: true` | 同 stage 内 task 共享前置 parent，彼此不互相依赖 |
 | `stage.id == report` | `--assignee gen` |
-| `stage.skills` 包含入口 skill 本身 | `--assignee gen` |
+| `stage.skills` 包含编排型 skill 本身（终端 stage） | `--assignee gen` |
 | 其他 stage | `--assignee worker` |
 
 首版不使用 `hermes kanban swarm`。官方 swarm helper 是固定的 workers -> verifier -> synthesizer 拓扑；我们先不做 verifier，所以直接用 `kanban create` + parent 依赖表达 DAG。
@@ -162,7 +162,7 @@ profile task    /
 最终 gen task：
 
 ```text
-执行 Noetic 入口报告卡片：<entry skill>
+执行 Noetic 编排型报告卡片：<skill>
 
 目标公司：<company>
 消费前置 artifact：<inputs>
@@ -171,7 +171,7 @@ profile task    /
 要求：
 - 只综合父任务交接中的 artifact、来源、数据时间和 evidence_gaps
 - 不重新取数，不补造缺失信息
-- 按该入口 skill 的 SKILL.md 和 card.yaml 输出报告
+- 按该 skill 的 SKILL.md 和 card.yaml 输出报告
 - 完成时在 kanban summary 中返回最终报告摘要和关键 evidence_gaps
 ```
 
@@ -185,7 +185,7 @@ skills/noetic-workflow/scripts/noetic_workflow.py
 
 职责：
 
-1. 读取入口 skill 的 `references/workflow.yaml`（planned 模式）。
+1. 读取编排型 skill 的 `references/workflow.yaml`（planned 模式）。
 2. 校验 `stages[].skills[]` 都存在。
 3. 根据 `outputs -> task_id` 建 parent 关系。
 4. `compile` 模式输出 DAG JSON，供查看和调试编译结果。
@@ -206,7 +206,7 @@ skills/noetic-workflow/scripts/noetic_workflow.py
 - 标准尽调/投分、要可复现 DAG → `planned`
 - 用户只有粗需求、探索拆图效果 → `auto`（可加 `--dispatch` 立即 nudge dispatcher）
 
-`auto` 模式不保证与 `workflow.yaml` 拓扑一致；`--skill` 可选，仅作为 triage body 中的入口提示。
+`auto` 模式不保证与 `workflow.yaml` 拓扑一致；`--skill` 可选，仅作为 triage body 中的编排型 skill 提示。
 
 示例：
 
@@ -260,7 +260,7 @@ python skills/noetic-workflow/scripts/noetic_workflow.py execute \
 ```bash
 hermes profile create worker --clone --description "Runs Noetic worker knowledge cards and returns structured artifacts with evidence gaps."
 
-hermes profile create gen --clone --description "Runs Noetic report entry cards from parent task artifacts. It does not invent missing facts."
+hermes profile create gen --clone --description "Runs Noetic orchestrating report cards from parent task artifacts. It does not invent missing facts."
 ```
 
 这两个 profile 都要能加载 NoeticAI Knowledge 套件；区别是首版通过任务正文约束职责，不先做复杂的 profile skill 白名单。
@@ -356,7 +356,7 @@ python /path/to/noeticai-knowledge/skills/noetic-workflow/scripts/noetic_workflo
 
 orchestrator skill 做三件事：
 
-1. 识别入口 workflow：企业尽调 -> `noetic-due-diligence`，投资分析 -> `noetic-investment-analysis`。
+1. 识别编排 workflow：企业尽调 -> `noetic-due-diligence`，投资分析 -> `noetic-investment-analysis`。
 2. 识别目标公司和可选 workspace。
 3. 调用 `skills/noetic-workflow/scripts/noetic_workflow.py execute --apply`，把创建出来的 task id 返回给用户。
 

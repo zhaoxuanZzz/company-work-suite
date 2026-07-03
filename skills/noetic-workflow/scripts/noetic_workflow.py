@@ -189,7 +189,7 @@ def task_body(entry_skill: str, company: str, stage: dict[str, object], skill: s
     inputs = ", ".join(stage.get("inputs", [])) or "none"
     output_text = ", ".join(outputs) or "none"
     if assignee == "gen":
-        return f"""执行 Noetic 入口报告卡片：{skill}
+        return f"""执行 Noetic 编排型报告卡片：{skill}
 
 目标公司：{company}
 消费前置 artifact：{inputs}
@@ -198,7 +198,7 @@ def task_body(entry_skill: str, company: str, stage: dict[str, object], skill: s
 要求：
 - 只综合父任务交接中的 artifact、来源、数据时间和 evidence_gaps
 - 不重新取数，不补造缺失信息
-- 按该入口 skill 的 SKILL.md 和 card.yaml 输出报告
+- 按该 skill 的 SKILL.md 和 card.yaml 输出报告
 - 完成时返回最终报告摘要和关键 evidence_gaps
 """
     return f"""执行 Noetic 知识卡片：{skill}
@@ -269,7 +269,7 @@ def build_triage_plan(company: str, skill_hint: str | None) -> TriagePlan:
     return TriagePlan(
         title=f"[Noetic] {company} / {label}",
         body=f"""目标公司：{company}
-入口 skill 提示：{hint}
+编排型 skill 提示：{hint}
 期望交付：企业尽调或投资分析类结构化报告（含 evidence_gaps）
 
 要求：
@@ -369,7 +369,7 @@ def profile_create_command(profile: str) -> str:
     if profile == "worker":
         return 'hermes profile create worker --clone --description "Runs Noetic worker knowledge cards and returns structured artifacts with evidence gaps."'
     if profile == "gen":
-        return 'hermes profile create gen --clone --description "Runs Noetic report entry cards from parent task artifacts. It does not invent missing facts."'
+        return 'hermes profile create gen --clone --description "Runs Noetic orchestrating report cards from parent task artifacts. It does not invent missing facts."'
     return f"hermes profile create {shlex.quote(profile)} --clone"
 
 

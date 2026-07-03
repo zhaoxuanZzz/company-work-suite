@@ -6,7 +6,7 @@
 
 - `skills/<skill-name>/SKILL.md` 存放每个卡片或 workflow skill 的 Agent 执行说明。
 - `skills/<skill-name>/card.yaml` 存放知识卡片的结构化元数据。
-- `skills/<entry-skill>/references/workflow.yaml` 定义入口 skill 的前置流程，例如企业尽调和投资分析。
+- `skills/<orchestrating-skill>/references/workflow.yaml` 定义编排型 skill 的前置流程，例如企业尽调和投资分析。
 - `.codex-plugin/plugin.json`、`.claude-plugin/plugin.json`、`plugin.yaml`、`__init__.py` 是不同宿主的兼容入口。
 - `scripts/validate_work_suite.py` 是静态契约校验脚本。
 - `tests/integration/` 存放 workflow 与 Hermes 后端集成测试；测试数据在 `tests/fixtures/`。

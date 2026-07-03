@@ -1,10 +1,10 @@
 # Skill Workflow
 
-本文定义 NoeticAI plugin 的 skill workflow 结构规范。目标是让 Hermes、Codex、Qoder 等平台可发现的入口保持为 `skills/*/SKILL.md`，同时允许入口 skill 通过内部 workflow 编排前置原子 skills。
+本文定义 NoeticAI plugin 的 skill workflow 结构规范。目标是让 Hermes、Codex、Qoder 等平台可发现的入口保持为 `skills/*/SKILL.md`，同时允许编排型 skill 通过内部 workflow 声明前置 stage 与产物依赖。
 
 ## 目标与非目标
 
-插件是面向企业研究的专家包，包含原子 skill、入口 skill、入口 skill 内部 workflow。它建立在多平台 skills plugin 结构之上，不替代各宿主需要的 manifest。
+插件是面向企业研究的专家包，包含原子 skill、编排型 skill，以及编排型 skill 内部的 workflow。它建立在多平台 skills plugin 结构之上，不替代各宿主需要的 manifest。
 
 首版只定义目录、静态引用和人工可读语义，不实现 workflow runner，不新增数据库模型，不改知识卡片执行链路。产物结构与质量约束由各 skill 的 `card.yaml` 和 `SKILL.md` 表达，不在本仓库做独立 eval。
 
@@ -33,9 +33,9 @@
 
 - `<plugin-name>` 使用 kebab-case，且必须等于 manifest 中的 `name`。
 - 至少一个宿主 manifest 必须存在；支持 `.codex-plugin/plugin.json`、`.claude-plugin/plugin.json` 等平台入口。
-- 不在 `plugin.json` 添加 workflow 自定义字段；workflow 元数据放在对应入口 skill 的 `references/workflow.yaml`。
+- 不在 `plugin.json` 添加 workflow 自定义字段；workflow 元数据放在对应编排型 skill 的 `references/workflow.yaml`。
 - `skills/` 下每个目录是一个 skill，必须包含 `SKILL.md`。
-- 入口 skill 可以在 `references/workflow.yaml` 显式编排前置原子 skills。
+- 编排型 skill 可以在 `references/workflow.yaml` 显式编排前置原子 skills。
 - workflow 只表达业务 SOP 编排，不写底层执行代码。
 - 外部系统能力由 MCP/plugin 既有机制提供，Work Suite 不另行定义连接协议。
 - 跨 skill 复用资料应优先收口到拥有该职责的 skill；只有真正跨职责复用的资料才单独建共享目录。
@@ -47,15 +47,15 @@
 | 概念 | 职责 |
 | --- | --- |
 | Plugin | 领域专家包，例如 `noeticai-knowledge` |
-| 原子 Skill | 单项能力，例如企业画像、司法风险分析 |
-| 入口 Skill | 可被用户直接触发的业务能力，例如企业尽调、投资分析 |
-| Skill Workflow | 入口 skill 内部显式编排多个 skill 的 stage、前置、并行、产物传递 |
+| 原子 Skill | 单项能力，例如企业画像、司法风险分析；可独立调用，也可作为其他 workflow 的 stage |
+| 编排型 Skill | 拥有终端业务能力，并通过 `references/workflow.yaml` 声明前置 stage 与产物依赖，例如企业尽调、投资分析 |
+| Skill Workflow | 编排型 skill 内部显式编排多个 skill 的 stage、前置、并行、产物传递 |
 | Artifact | stage 间传递的结构化产物名称；具体字段由各 skill 的 `card.yaml` 定义 |
 | `/noetic-workflow` | Noetic workflow 的规范解释、创建辅助和执行入口；支持 `planned`（静态 workflow.yaml）与 `auto`（Hermes triage 自动拆图）两种执行模式 |
 
-核心原则：采用入口 skill 内部 workflow 显式表达业务顺序。Skill 可以描述输入、输出、触发条件和失败条件，但 v1 只把这些内容作为静态约定。
+核心原则：每个 skill 能力独立；需要标准前置流程时，由编排型 skill 的内部 workflow 显式表达业务顺序。Skill 可以描述输入、输出、触发条件和失败条件，但 v1 只把这些内容作为静态约定。
 
-`/noetic-workflow` 是通用管理入口：它可以解释 workflow 规范、辅助创建 `references/workflow.yaml`，并把入口 skill 的 workflow 提交到当前试行执行层。执行时用户可选择 **planned**（按 `workflow.yaml` 确定性编排）或 **auto**（提交 Hermes triage 卡由 `kanban_decomposer` 自动拆图）。入口报告 skill 不应在缺少前置产物时自行串行调用前置卡片，而应转交 `/noetic-workflow` 执行对应 workflow。
+`/noetic-workflow` 是通用管理入口：它可以解释 workflow 规范、辅助创建 `references/workflow.yaml`，并把编排型 skill 的 workflow 提交到当前试行执行层。执行时用户可选择 **planned**（按 `workflow.yaml` 确定性编排）或 **auto**（提交 Hermes triage 卡由 `kanban_decomposer` 自动拆图）。编排型 skill 不应在缺少前置产物时自行串行调用前置卡片，而应转交 `/noetic-workflow` 执行对应 workflow。
 
 ## Workflow YAML 最小语义
 
@@ -80,7 +80,7 @@ stages:
 
 字段约定：
 
-- `name`：workflow 展示名，通常与入口 skill 同名。
+- `name`：workflow 展示名，通常与编排型 skill 同名。
 - `stages`：按顺序执行的阶段列表。
 - `stages[].id`：稳定阶段标识，使用 snake_case。
 - `stages[].skills`：本阶段需要调用的原子 skills。
@@ -94,7 +94,7 @@ v1 校验脚本只支持上述 YAML 子集，尤其是 `skills`、`inputs`、`ou
 
 | 知识卡片机制 | Skill workflow 机制 |
 | --- | --- |
-| `[调用卡片:id:<card_id>]` | `skills/<入口skill>/references/workflow.yaml` 的 `stages[].skills` |
+| `[调用卡片:id:<card_id>]` | `skills/<编排型skill>/references/workflow.yaml` 的 `stages[].skills` |
 | 子卡片输出 | artifact |
 | `task_relations` | workflow stage graph |
 | `caller_session_id` | 后续 runner 可参考的 run/parent id |
@@ -134,7 +134,7 @@ credit-rating-analyst/
       references/workflow.yaml
 ```
 
-这个套件中，入口 skill 是多平台可发现入口；workflow 是入口 skill 内的 SOP；各 skill 的 `card.yaml` 负责产物字段约束。
+这个套件中，编排型 skill 持有 workflow SOP；各 skill 的 `card.yaml` 负责产物字段约束；跨平台可发现入口仍是 `skills/*/SKILL.md`。
 
 ## 评审场景
 

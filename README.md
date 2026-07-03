@@ -17,7 +17,7 @@
 
 ## Skill 内 Workflow
 
-业务 workflow 放在对应入口 skill 的 `references/workflow.yaml` 中，作为该 skill 的前置执行流程；跨平台可发现入口仍然是 `skills/*/SKILL.md`。
+业务 workflow 放在对应编排型 skill 的 `references/workflow.yaml` 中，声明该 skill 的前置 stage 与产物依赖；跨平台可发现入口仍然是 `skills/*/SKILL.md`。
 
 | Skill | Workflow |
 |----------|------|
@@ -41,7 +41,7 @@ ln -s /Users/zhaoxuan/code/noeticai-knowledge \
   ~/plugins/noeticai-knowledge
 ```
 
-详细方案见 [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-plan.md)。
+详细方案见 [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-plan.md)，调研情况见 [docs/pluginization-research.md](./docs/pluginization-research.md)。
 
 静态校验：
 
@@ -59,7 +59,7 @@ python3 scripts/validate_work_suite.py .
 ├── skills/
 │   ├── {skill-name}/SKILL.md        # 卡片执行说明
 │   ├── {skill-name}/card.yaml       # 卡片结构化元数据
-│   ├── {entry-skill}/references/workflow.yaml
+│   ├── {orchestrating-skill}/references/workflow.yaml
 │   └── noetic-karpathy-llm-wiki/       # LLM Wiki 技能
 ├── CONNECTORS.md
 ├── docs/WORK_SUITE_WORKFLOW.md
