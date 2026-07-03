@@ -48,6 +48,9 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
 
         self.assertIn("noetic-due-diligence", ctx.skills)
         self.assertIn("noetic-due-diligence", ctx.commands)
+        self.assertIn("企业尽调", ctx.command_descriptions["noetic-due-diligence"])
+        self.assertIn("基于企业画像", ctx.command_descriptions["noetic-due-diligence"])
+        self.assertIn("输入公司名称", ctx.command_args_hints["noetic-due-diligence"])
         command_prompt = ctx.commands["noetic-due-diligence"]("杭州XX科技有限公司")
         self.assertIn("`noeticai-knowledge:noetic-due-diligence`", command_prompt)
         self.assertIn("杭州XX科技有限公司", command_prompt)
@@ -347,6 +350,8 @@ class FakeHermesCtx:
         self.skills: dict[str, str] = {}
         self.hooks = {}
         self.commands = {}
+        self.command_descriptions: dict[str, str] = {}
+        self.command_args_hints: dict[str, str] = {}
 
     def register_skill(self, name: str, path: Path) -> None:
         self.skills[name] = Path(path).as_posix()
@@ -356,6 +361,8 @@ class FakeHermesCtx:
 
     def register_command(self, name: str, handler, description: str = "", args_hint: str = "") -> None:
         self.commands[name] = handler
+        self.command_descriptions[name] = description
+        self.command_args_hints[name] = args_hint
 
 
 class FakeEvent:

@@ -15,6 +15,34 @@ def _skill_names() -> set[str]:
     } if SKILLS_DIR.exists() else set()
 
 
+def _frontmatter_value(path: Path, key: str) -> str:
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except OSError:
+        return ""
+    if not lines or lines[0] != "---":
+        return ""
+    prefix = f"{key}:"
+    for line in lines[1:]:
+        if line == "---":
+            return ""
+        if line.startswith(prefix):
+            return line.split(":", 1)[1].strip().strip("'\"")
+    return ""
+
+
+def _command_description(skill_md: Path, command: str) -> str:
+    display = _frontmatter_value(skill_md, "displayName")
+    description = _frontmatter_value(skill_md, "description")
+    if display and description:
+        return f"{display}：{description}"
+    return description or display or f"Load NoeticAI skill {command}."
+
+
+def _command_args_hint(skill_md: Path) -> str:
+    return _frontmatter_value(skill_md, "argument-hint") or "[company or notes]"
+
+
 def _skill_prompt(command: str, args: str = "") -> str:
     tail = args.strip()
     suffix = f"\n\nUser arguments: {tail}" if tail else ""
@@ -67,9 +95,10 @@ def register(ctx):
     ctx.register_hook("pre_gateway_dispatch", rewrite_gateway_command)
 
     for command in sorted(_skill_names()):
+        skill_md = SKILLS_DIR / command / "SKILL.md"
         ctx.register_command(
             command,
             _make_skill_command_handler(ctx, command),
-            description=f"Load NoeticAI skill {command}.",
-            args_hint="[company or notes]",
+            description=_command_description(skill_md, command),
+            args_hint=_command_args_hint(skill_md),
         )
