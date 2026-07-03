@@ -166,6 +166,34 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             self.assertEqual(["h1"], parent_values(calls[3]))
             self.assertEqual(["h1", "h2", "h3", "h4"], parent_values(calls[4]))
 
+    def test_apply_passes_tenant_to_every_planned_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            log_path = temp_path / "hermes-calls.jsonl"
+            fake_hermes = temp_path / "hermes"
+            write_fake_hermes(fake_hermes, log_path)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{temp_path}{os.pathsep}{env.get('PATH', '')}"
+            run_command(
+                str(SCRIPT),
+                "execute",
+                "--skill",
+                "noetic-due-diligence",
+                "--company",
+                "杭州XX科技有限公司",
+                "--workspace",
+                "dir:/tmp/noetic-run",
+                "--tenant",
+                "batch-20260703-hzxx",
+                "--apply",
+                env=env,
+            )
+
+            calls = [json.loads(line)["argv"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual(5, len(calls))
+            self.assertTrue(all(call[call.index("--tenant") + 1] == "batch-20260703-hzxx" for call in calls))
+
     def test_real_company_names_apply_with_fake_hermes(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
@@ -284,6 +312,33 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
             self.assertIn("--triage", calls[0])
             self.assertNotIn("--assignee", calls[0])
 
+    def test_auto_apply_passes_tenant_to_triage_task(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            log_path = temp_path / "hermes-calls.jsonl"
+            fake_hermes = temp_path / "hermes"
+            write_fake_hermes(fake_hermes, log_path)
+
+            env = os.environ.copy()
+            env["PATH"] = f"{temp_path}{os.pathsep}{env.get('PATH', '')}"
+            run_command(
+                str(SCRIPT),
+                "execute",
+                "--mode",
+                "auto",
+                "--company",
+                "小米科技有限责任公司",
+                "--skill",
+                "noetic-due-diligence",
+                "--tenant",
+                "batch-xiaomi",
+                "--apply",
+                env=env,
+            )
+
+            calls = [json.loads(line)["argv"] for line in log_path.read_text(encoding="utf-8").splitlines()]
+            self.assertEqual("batch-xiaomi", calls[0][calls[0].index("--tenant") + 1])
+
     def test_auto_apply_with_dispatch(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             temp_path = Path(temp)
@@ -326,6 +381,76 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
 
         self.assertIn("Noetic workflow execution plan: noetic-due-diligence (5 tasks)", result.stdout)
         self.assertEqual(5, result.stdout.count("hermes kanban create"))
+
+    def test_planned_default_workspace_under_noeticai(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runs_root = Path(temp) / "kanban-runs"
+            env = os.environ.copy()
+            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            result = run_command(
+                str(SCRIPT),
+                "execute",
+                "--skill",
+                "noetic-due-diligence",
+                "--company",
+                "杭州XX科技有限公司",
+                "--tenant",
+                "batch-20260703-hzxx",
+                "--dry-run",
+                env=env,
+            )
+
+            expected = f"dir:{(runs_root / 'batch-20260703-hzxx').resolve()}"
+            self.assertIn(f"workspace: {expected}", result.stdout)
+            self.assertIn(f"--workspace {expected}", result.stdout)
+
+    def test_auto_default_workspace_under_noeticai(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            runs_root = Path(temp) / "kanban-runs"
+            env = os.environ.copy()
+            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            result = run_command(
+                str(SCRIPT),
+                "execute",
+                "--mode",
+                "auto",
+                "--company",
+                "小米科技有限责任公司",
+                "--tenant",
+                "batch-xiaomi",
+                "--dry-run",
+                env=env,
+            )
+
+            expected = f"dir:{(runs_root / 'batch-xiaomi').resolve()}"
+            self.assertIn(f"workspace: {expected}", result.stdout)
+            self.assertIn(f"--workspace {expected}", result.stdout)
+
+    def test_apply_creates_default_workspace_dir(self) -> None:
+        with tempfile.TemporaryDirectory() as temp:
+            temp_path = Path(temp)
+            runs_root = temp_path / "kanban-runs"
+            log_path = temp_path / "hermes-calls.jsonl"
+            fake_hermes = temp_path / "hermes"
+            write_fake_hermes(fake_hermes, log_path)
+
+            env = os.environ.copy()
+            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            env["PATH"] = f"{temp_path}{os.pathsep}{env.get('PATH', '')}"
+            run_command(
+                str(SCRIPT),
+                "execute",
+                "--skill",
+                "noetic-due-diligence",
+                "--company",
+                "杭州XX科技有限公司",
+                "--tenant",
+                "batch-20260703-hzxx",
+                "--apply",
+                env=env,
+            )
+
+            self.assertTrue((runs_root / "batch-20260703-hzxx").is_dir())
 
 
 def parent_values(argv: list[str]) -> list[str]:

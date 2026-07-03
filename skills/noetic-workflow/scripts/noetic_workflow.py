@@ -4,15 +4,20 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
+import os
+import re
 import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_KANBAN_RUNS_DIR = Path.home() / ".noeticai" / "kanban-runs"
 
 
 class WorkSuiteError(Exception):
@@ -263,6 +268,36 @@ def build_task_plan(entry_skill: str, company: str, workspace: str) -> list[Task
     return tasks
 
 
+def kanban_runs_root() -> Path:
+    override = os.environ.get("NOETICAI_KANBAN_RUNS_DIR", "").strip()
+    return Path(override).expanduser() if override else DEFAULT_KANBAN_RUNS_DIR
+
+
+def company_slug(company: str) -> str:
+    ascii_slug = re.sub(r"[^a-z0-9]+", "-", company.lower()).strip("-")
+    if ascii_slug:
+        return ascii_slug[:32]
+    digest = hashlib.sha256(company.encode("utf-8")).hexdigest()
+    return digest[:8]
+
+
+def default_tenant(company: str) -> str:
+    return f"batch-{date.today().strftime('%Y%m%d')}-{company_slug(company)}"
+
+
+def resolve_workspace(company: str, tenant: str | None, workspace: str | None) -> str:
+    if workspace:
+        return workspace
+    run_id = tenant or default_tenant(company)
+    run_dir = kanban_runs_root() / run_id
+    return f"dir:{run_dir.resolve()}"
+
+
+def ensure_workspace_dir(workspace: str) -> None:
+    if workspace.startswith("dir:"):
+        Path(workspace[4:]).mkdir(parents=True, exist_ok=True)
+
+
 def build_triage_plan(company: str, skill_hint: str | None) -> TriagePlan:
     label = skill_hint or "workflow"
     hint = skill_hint or "由编排器根据需求判断"
@@ -280,7 +315,7 @@ def build_triage_plan(company: str, skill_hint: str | None) -> TriagePlan:
     )
 
 
-def hermes_command(task: TaskPlan, workspace: str, resolved_ids: dict[str, str]) -> list[str]:
+def hermes_command(task: TaskPlan, workspace: str, resolved_ids: dict[str, str], tenant: str | None = None) -> list[str]:
     command = [
         "hermes",
         "kanban",
@@ -296,13 +331,15 @@ def hermes_command(task: TaskPlan, workspace: str, resolved_ids: dict[str, str])
         workspace,
         "--json",
     ]
+    if tenant:
+        command.extend(["--tenant", tenant])
     for parent in task.parents:
         command.extend(["--parent", resolved_ids.get(parent, parent)])
     return command
 
 
-def hermes_triage_command(plan: TriagePlan) -> list[str]:
-    return [
+def hermes_triage_command(plan: TriagePlan, workspace: str, tenant: str | None = None) -> list[str]:
+    command = [
         "hermes",
         "kanban",
         "create",
@@ -310,8 +347,13 @@ def hermes_triage_command(plan: TriagePlan) -> list[str]:
         "--body",
         plan.body,
         "--triage",
+        "--workspace",
+        workspace,
         "--json",
     ]
+    if tenant:
+        command.extend(["--tenant", tenant])
+    return command
 
 
 def parse_hermes_task_id(stdout: str) -> str:
@@ -330,11 +372,12 @@ def printable_command(command: list[str]) -> list[str]:
 
 
 def command_compile(args: argparse.Namespace) -> int:
-    tasks = build_task_plan(args.skill, args.company, args.workspace)
+    workspace = resolve_workspace(args.company, args.tenant, args.workspace)
+    tasks = build_task_plan(args.skill, args.company, workspace)
     graph = {
         "skill": args.skill,
         "company": args.company,
-        "workspace": args.workspace,
+        "workspace": workspace,
         "nodes": [
             {
                 "id": task.task_id,
@@ -377,8 +420,6 @@ def validate_execute_args(args: argparse.Namespace) -> None:
     if args.mode == "planned":
         if not args.skill:
             raise WorkSuiteError("--skill is required for planned mode")
-        if not args.workspace:
-            raise WorkSuiteError("--workspace is required for planned mode")
         return
     if args.dispatch and not args.apply:
         raise WorkSuiteError("--dispatch requires --apply")
@@ -387,24 +428,27 @@ def validate_execute_args(args: argparse.Namespace) -> None:
 
 
 def command_execute_planned(args: argparse.Namespace) -> int:
-    tasks = build_task_plan(args.skill, args.company, args.workspace)
+    workspace = resolve_workspace(args.company, args.tenant, args.workspace)
+    tasks = build_task_plan(args.skill, args.company, workspace)
     resolved_ids: dict[str, str] = {}
 
     print(f"Noetic workflow execution plan: {args.skill} ({len(tasks)} tasks)")
+    print(f"workspace: {workspace}")
     for task in tasks:
         print(f"- {task.task_id}: {task.assignee} {task.skill} parents={task.parents or []} outputs={task.outputs or []}")
 
     if args.dry_run or not args.apply:
         print("\nDry run Hermes Kanban commands:")
         for task in tasks:
-            command = hermes_command(task, args.workspace, resolved_ids)
+            command = hermes_command(task, workspace, resolved_ids, args.tenant)
             print(shlex.join(printable_command(command)))
         return 0
 
     ensure_profiles(tasks)
+    ensure_workspace_dir(workspace)
 
     for task in tasks:
-        command = hermes_command(task, args.workspace, resolved_ids)
+        command = hermes_command(task, workspace, resolved_ids, args.tenant)
         result = subprocess.run(command, text=True, capture_output=True, check=True)
         task_id = parse_hermes_task_id(result.stdout)
         resolved_ids[str(task.task_id)] = task_id
@@ -414,18 +458,21 @@ def command_execute_planned(args: argparse.Namespace) -> int:
 
 
 def command_execute_auto(args: argparse.Namespace) -> int:
+    workspace = resolve_workspace(args.company, args.tenant, args.workspace)
     plan = build_triage_plan(args.company, args.skill)
 
     print(f"Noetic workflow auto triage: {args.company}")
     print(f"- entry hint: {args.skill or 'none'}")
+    print(f"workspace: {workspace}")
 
-    command = hermes_triage_command(plan)
+    command = hermes_triage_command(plan, workspace, args.tenant)
 
     if args.dry_run or not args.apply:
         print("\nDry run Hermes Kanban command:")
         print(shlex.join(printable_command(command)))
         return 0
 
+    ensure_workspace_dir(workspace)
     result = subprocess.run(command, text=True, capture_output=True, check=True)
     task_id = parse_hermes_task_id(result.stdout)
     print(f"created triage: {task_id}")
@@ -466,14 +513,19 @@ def build_parser() -> argparse.ArgumentParser:
     compile_parser = subparsers.add_parser("compile")
     compile_parser.add_argument("--skill", required=True)
     compile_parser.add_argument("--company", required=True)
-    compile_parser.add_argument("--workspace", required=True)
+    compile_parser.add_argument("--tenant", help="Hermes Kanban tenant namespace for this workflow batch")
+    compile_parser.add_argument("--workspace", help="Hermes workspace; default ~/.noeticai/kanban-runs/<tenant>")
     compile_parser.set_defaults(func=command_compile)
 
     execute = subparsers.add_parser("execute")
     execute.add_argument("--mode", choices=["planned", "auto"], default="planned")
     execute.add_argument("--skill")
     execute.add_argument("--company", required=True)
-    execute.add_argument("--workspace")
+    execute.add_argument(
+        "--workspace",
+        help="Hermes workspace; default dir:~/.noeticai/kanban-runs/<tenant>",
+    )
+    execute.add_argument("--tenant", help="Hermes Kanban tenant namespace for this workflow batch")
     execute.add_argument("--dry-run", action="store_true")
     execute.add_argument("--apply", action="store_true")
     execute.add_argument(
