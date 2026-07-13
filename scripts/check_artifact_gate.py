@@ -200,7 +200,7 @@ def check_final(
     """Run final-mode gate. Returns (exit_code, messages).
 
     ``run_dir`` is the company knowledge-base root (same as raw/wiki),
-    i.e. ``NOETICAI_COMPANY_KB_DIR`` or ``~/.noeticai/company-knowledge``.
+    i.e. ``CWS_COMPANY_KB_DIR`` or ``~/.cws/company-knowledge``.
     """
     try:
         _card, gate = load_skill_gate(plugin_root, skill_id)

@@ -1,6 +1,6 @@
 # Skill Workflow
 
-本文定义 NoeticAI plugin 的 skill workflow 结构规范。目标是让 Hermes、Codex、Qoder 等平台可发现的入口保持为 `skills/*/SKILL.md`，同时允许编排型 skill 通过内部 workflow 声明前置 stage 与产物依赖。
+本文定义 Company Work Suite plugin 的 skill workflow 结构规范。目标是让 Hermes、Codex、Qoder 等平台可发现的入口保持为 `skills/*/SKILL.md`，同时允许编排型 skill 通过内部 workflow 声明前置 stage 与产物依赖。
 
 ## 目标与非目标
 
@@ -46,16 +46,16 @@
 
 | 概念 | 职责 |
 | --- | --- |
-| Plugin | 领域专家包，例如 `noeticai-knowledge` |
+| Plugin | 领域专家包，例如 `company-work-suite` |
 | 原子 Skill | 单项能力，例如企业画像、司法风险分析；可独立调用，也可作为其他 workflow 的 stage |
 | 编排型 Skill | 拥有终端业务能力，并通过 `references/workflow.yaml` 声明前置 stage 与产物依赖，例如企业尽调、投资分析 |
 | Skill Workflow | 编排型 skill 内部显式编排多个 skill 的 stage、前置、并行、产物传递 |
 | Artifact | stage 间传递的结构化产物名称；具体字段由各 skill 的 `card.yaml` 定义 |
-| `/noetic-workflow` | Noetic workflow 的规范解释、创建辅助和执行入口；支持 `planned`（静态 workflow.yaml）与 `auto`（Hermes triage 自动拆图）两种执行模式 |
+| `/cws-workflow` | CWS workflow 的规范解释、创建辅助和执行入口；支持 `planned`（静态 workflow.yaml）与 `auto`（Hermes triage 自动拆图）两种执行模式 |
 
 核心原则：每个 skill 能力独立；需要标准前置流程时，由编排型 skill 的内部 workflow 显式表达业务顺序。Skill 可以描述输入、输出、触发条件和失败条件，但 v1 只把这些内容作为静态约定。
 
-`/noetic-workflow` 是通用管理入口：它可以解释 workflow 规范、辅助创建 `references/workflow.yaml`，并把编排型 skill 的 workflow 提交到当前试行执行层。执行时用户可选择 **planned**（按 `workflow.yaml` 确定性编排）或 **auto**（提交 Hermes triage 卡由 `kanban_decomposer` 自动拆图）。编排型 skill 不应在缺少前置产物时自行串行调用前置卡片，而应转交 `/noetic-workflow` 执行对应 workflow。
+`/cws-workflow` 是通用管理入口：它可以解释 workflow 规范、辅助创建 `references/workflow.yaml`，并把编排型 skill 的 workflow 提交到当前试行执行层。执行时用户可选择 **planned**（按 `workflow.yaml` 确定性编排）或 **auto**（提交 Hermes triage 卡由 `kanban_decomposer` 自动拆图）。编排型 skill 不应在缺少前置产物时自行串行调用前置卡片，而应转交 `/cws-workflow` 执行对应 workflow。
 
 ## Workflow YAML 最小语义
 

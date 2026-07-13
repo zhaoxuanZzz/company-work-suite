@@ -1,5 +1,5 @@
 ---
-name: noetic-karpathy-llm-wiki
+name: cws-karpathy-llm-wiki
 description: "Use when building or maintaining a personal LLM-powered knowledge base. Triggers: ingesting sources into a wiki, querying wiki knowledge, linting wiki quality, 'add to wiki', 'what do I know about', or any mention of 'LLM wiki' or 'Karpathy wiki'."
 ---
 
@@ -7,7 +7,7 @@ description: "Use when building or maintaining a personal LLM-powered knowledge 
 
 Build and maintain a personal knowledge base using LLMs. You manage two directories: `raw/` (immutable source material) and `wiki/` (compiled knowledge articles). Sources go into raw/, you compile them into wiki articles, and the wiki compounds over time.
 
-When another skill provides a knowledge-base root, treat that directory as the root for every `raw/` and `wiki/` path. For NoeticAI company workflows, use `NOETICAI_COMPANY_KB_DIR` when set, otherwise `~/.noeticai/company-knowledge`.
+When another skill provides a knowledge-base root, treat that directory as the root for every `raw/` and `wiki/` path. For company workflows, use `CWS_COMPANY_KB_DIR` when set, otherwise `~/.cws/company-knowledge`.
 
 Core ideas from Karpathy:
 - "The LLM writes and maintains the wiki; the human reads and asks questions."
@@ -23,7 +23,7 @@ Three layers, all under the active knowledge-base root:
 - `wiki/index.md` — Global index. One row per article, grouped by topic, with link + summary + Updated date.
 - `wiki/log.md` — Append-only operation log.
 
-**artifacts/** — NoeticAI runtime handoff outputs (`artifacts/<skill-id>/handoff.json`), co-located with `raw/` and `wiki/` under the same knowledge-base root. Managed by data/gen agents and checked by `scripts/check_artifact_gate.py`.
+**artifacts/** — Runtime handoff outputs (`artifacts/<skill-id>/handoff.json`), co-located with `raw/` and `wiki/` under the same knowledge-base root. Managed by data/gen agents and checked by `scripts/check_artifact_gate.py`.
 
 **SKILL.md** (this file) — Schema layer. Defines structure and workflow rules.
 

@@ -1,4 +1,4 @@
-"""Hermes Kanban completion gate for Noetic workflow tasks."""
+"""Hermes Kanban completion gate for CWS workflow tasks."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
-_CONTEXT = re.compile(r"noetic_gate: skill=([a-z0-9-]+) run_id=([a-z0-9-]+)")
+_CONTEXT = re.compile(r"cws_gate: skill=([a-z0-9-]+) run_id=([a-z0-9-]+)")
 
 
 def task_context(body: str | None) -> tuple[str, str] | None:
@@ -19,7 +19,7 @@ def task_context(body: str | None) -> tuple[str, str] | None:
 
 
 def _result_dir(run_id: str, skill: str) -> Path:
-    root = Path(os.environ.get("NOETICAI_COMPANY_KB_DIR", "~/.noeticai/company-knowledge")).expanduser()
+    root = Path(os.environ.get("CWS_COMPANY_KB_DIR", "~/.cws/company-knowledge")).expanduser()
     return root / "artifacts" / run_id / skill
 
 
@@ -80,7 +80,7 @@ def gate_completion(task_id: str, body: str | None, *, board: str | None = None)
 
     conn = kanban_db.connect(board=board)
     try:
-        kanban_db.block_task(conn, task_id, reason="Noetic gate failed: " + "; ".join(result["errors"]))
+        kanban_db.block_task(conn, task_id, reason="CWS gate failed: " + "; ".join(result["errors"]))
     finally:
         conn.close()
     return result
@@ -89,7 +89,7 @@ def gate_completion(task_id: str, body: str | None, *, board: str | None = None)
 def retry(task_id: str, body: str | None, *, board: str | None = None) -> dict[str, Any]:
     context = task_context(body)
     if context is None:
-        raise ValueError("task is not a Noetic gate task")
+        raise ValueError("task is not a CWS gate task")
     result = check(*context)
     if result is None or result["status"] == "passed":
         from hermes_cli import kanban_db
@@ -106,14 +106,14 @@ def retry(task_id: str, body: str | None, *, board: str | None = None) -> dict[s
 def waive(task_id: str, body: str | None, reason: str, *, board: str | None = None) -> dict[str, Any]:
     context = task_context(body)
     if context is None:
-        raise ValueError("task is not a Noetic gate task")
+        raise ValueError("task is not a CWS gate task")
     skill, run_id = context
     if not reason.strip():
         raise ValueError("--reason is required")
     result = {
         "run_id": run_id,
         "skill_id": skill,
-        "gate": "final" if skill in {"noetic-due-diligence", "noetic-investment-analysis"} else "node",
+        "gate": "final" if skill in {"cws-due-diligence", "cws-investment-analysis"} else "node",
         "status": "waived",
         "checked_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
         "handoff_path": str(_result_dir(run_id, skill) / "handoff.json"),
@@ -126,7 +126,7 @@ def waive(task_id: str, body: str | None, reason: str, *, board: str | None = No
 
     conn = kanban_db.connect(board=board)
     try:
-        if not kanban_db.complete_task(conn, task_id, summary="Noetic gate waived: " + reason.strip(), metadata={"noetic_gate": result}):
+        if not kanban_db.complete_task(conn, task_id, summary="CWS gate waived: " + reason.strip(), metadata={"cws_gate": result}):
             raise ValueError("task is not blocked or could not be completed")
     finally:
         conn.close()

@@ -36,7 +36,7 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
             "--mode",
             "node",
             "--skill",
-            "noetic-company-profile",
+            "cws-company-profile",
             "--handoff",
             str(handoff),
             "--run-id",
@@ -57,7 +57,7 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
             "--mode",
             "final",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--run-dir",
             str(root),
             "--run-id",
@@ -97,7 +97,7 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
             "--mode",
             "node",
             "--skill",
-            "noetic-litigation-risk",
+            "cws-litigation-risk",
             "--handoff",
             str(FIXTURES / "pass.handoff.json"),
             "--plugin-root",
@@ -133,7 +133,7 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
                 "--mode",
                 "final",
                 "--skill",
-                "noetic-company-profile",
+                "cws-company-profile",
                 "--run-dir",
                 temp,
                 "--plugin-root",
@@ -152,11 +152,11 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
     def test_final_gate_rejects_invalid_parent_json(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for skill in ("noetic-company-profile", "noetic-shareholder-structure", "noetic-litigation-risk", "noetic-financing-history"):
+            for skill in ("cws-company-profile", "cws-shareholder-structure", "cws-litigation-risk", "cws-financing-history"):
                 self.write_final_handoff(root, skill)
-            broken = root / "artifacts" / self.run_id / "noetic-litigation-risk" / "handoff.json"
+            broken = root / "artifacts" / self.run_id / "cws-litigation-risk" / "handoff.json"
             broken.write_text("{", encoding="utf-8")
-            self.write_final_handoff(root, "noetic-due-diligence")
+            self.write_final_handoff(root, "cws-due-diligence")
             result = self.final_gate(root)
         self.assertEqual(1, result.returncode)
         self.assertIn("invalid JSON", result.stderr)
@@ -164,8 +164,8 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
     def test_final_gate_rejects_mismatched_run_id(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for skill in ("noetic-company-profile", "noetic-shareholder-structure", "noetic-litigation-risk", "noetic-financing-history", "noetic-due-diligence"):
-                self.write_final_handoff(root, skill, "run-other" if skill == "noetic-litigation-risk" else self.run_id)
+            for skill in ("cws-company-profile", "cws-shareholder-structure", "cws-litigation-risk", "cws-financing-history", "cws-due-diligence"):
+                self.write_final_handoff(root, skill, "run-other" if skill == "cws-litigation-risk" else self.run_id)
             result = self.final_gate(root)
         self.assertEqual(1, result.returncode)
         self.assertIn("expected 'run-test'", result.stderr)
@@ -173,7 +173,7 @@ class ArtifactGateIntegrationTest(unittest.TestCase):
     def test_final_gate_accepts_complete_run(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
-            for skill in ("noetic-company-profile", "noetic-shareholder-structure", "noetic-litigation-risk", "noetic-financing-history", "noetic-due-diligence"):
+            for skill in ("cws-company-profile", "cws-shareholder-structure", "cws-litigation-risk", "cws-financing-history", "cws-due-diligence"):
                 self.write_final_handoff(root, skill)
             result = self.final_gate(root)
         self.assertEqual(0, result.returncode, result.stderr)

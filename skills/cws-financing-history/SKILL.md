@@ -1,5 +1,5 @@
 ---
-name: noetic-financing-history
+name: cws-financing-history
 displayName: 融资历史分析
 description: 输入公司名称，分析融资轮次、投资方、估值与资本市场信号。
 argument-hint: "输入公司名称，如：杭州XX科技有限公司"

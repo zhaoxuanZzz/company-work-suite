@@ -67,7 +67,7 @@ ready。`gate_blocked` 在依赖上不算完成。若父节点为人工豁免，
 ```json
 {
   "run_id": "run-...",
-  "skill_id": "noetic-company-profile",
+  "skill_id": "cws-company-profile",
   "gate": "node",
   "status": "passed | blocked | waived",
   "attempt": 2,

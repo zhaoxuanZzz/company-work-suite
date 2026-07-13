@@ -1,4 +1,4 @@
-id: noetic-company-basic-info
+id: cws-company-basic-info
 name: 企业基本信息查询
 description: 仅查询并回显目标企业工商登记基本信息，用于简单核对与插件联调测试。
 

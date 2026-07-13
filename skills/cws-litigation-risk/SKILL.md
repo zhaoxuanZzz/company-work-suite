@@ -1,5 +1,5 @@
 ---
-name: noetic-litigation-risk
+name: cws-litigation-risk
 displayName: 司法风险分析
 description: 输入公司名称，分析诉讼、执行、失信等司法风险信号。
 argument-hint: "输入公司名称，如：杭州XX科技有限公司"

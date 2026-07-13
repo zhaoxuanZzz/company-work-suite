@@ -1,5 +1,5 @@
 ---
-name: noetic-company-profile
+name: cws-company-profile
 displayName: 企业画像
 description: 输入公司名称，汇总企业基本信息、经营状态、行业定位与核心标签。
 argument-hint: "输入公司名称，如：杭州XX科技有限公司"
@@ -15,7 +15,7 @@ argument-hint: "输入公司名称，如：杭州XX科技有限公司"
 2. 按 `card.yaml` 的输入、输出字段、规则和 `gate` 整理企业画像。
 3. 不要编造工商或经营数据；缺失信息写入 `evidence_gaps`。
 4. 输出结论时必须标注依据字段和数据缺口。
-5. 编排运行时，由 `noetic-data-agent` 在 `artifacts/<run-id>/noetic-company-profile/handoff.json` 落盘含相同 `run_id` 的 handoff，并运行任务正文给出的 `scripts/check_artifact_gate.py --mode node --run-id <run-id>`；门禁未通过不得视为完成。
+5. 编排运行时，由 `cws-data-agent` 在 `artifacts/<run-id>/cws-company-profile/handoff.json` 落盘含相同 `run_id` 的 handoff，并运行任务正文给出的 `scripts/check_artifact_gate.py --mode node --run-id <run-id>`；门禁未通过不得视为完成。
 
 ## 输出格式
 

@@ -2,7 +2,7 @@
 
 日期：2026-07-10  
 状态：已实现（v1，含编排 run 隔离）
-范围：NoeticAI Work Suite 插件内的 Agent 运行时产物门禁
+范围：Company Work Suite 插件内的 Agent 运行时产物门禁
 
 ## 1. 背景与目标
 
@@ -33,7 +33,7 @@
 | 执行方 | CLI 脚本硬拦；skill 强制先写后检 |
 | 产物形态 | 必有 `handoff.json`；可选 Markdown 正文 |
 | 契约存放 | 正式写入 `card.yaml` 的 `gate` 段（单一事实来源） |
-| v1 范围 | 通用检查器 + `noetic-company-profile` 试点 |
+| v1 范围 | 通用检查器 + `cws-company-profile` 试点 |
 
 曾考虑的替代方案：
 
@@ -101,7 +101,7 @@ card.yaml (outputs + gate)
 
 未实现的 `behavior_checks[].id` 在静态校验阶段即失败。`when` / `require` / `forbid_keys` 等 YAML 附加字段若存在，必须与上表语义一致；检查器以 `id` 为准，不解释任意自然语言。
 
-### 4.5 试点示例：`noetic-company-profile`
+### 4.5 试点示例：`cws-company-profile`
 
 ```yaml
 outputs:
@@ -158,7 +158,7 @@ gate:
 
 ### 5.1 路径
 
-与企业信息库同根（`NOETICAI_COMPANY_KB_DIR`，未设置时为 `~/.noeticai/company-knowledge`），与 `raw/`、`wiki/` 并列：
+与企业信息库同根（`CWS_COMPANY_KB_DIR`，未设置时为 `~/.cws/company-knowledge`），与 `raw/`、`wiki/` 并列：
 
 ```text
 <company-kb>/artifacts/<run-id>/<skill-id>/handoff.json
@@ -171,7 +171,7 @@ gate:
 
 ```json
 {
-  "skill_id": "noetic-company-profile",
+  "skill_id": "cws-company-profile",
   "run_id": "run-20260710-example-a1b2c3d4",
   "role": "data",
   "subject": "杭州XX科技有限公司",
@@ -207,14 +207,14 @@ gate:
 ```bash
 python3 scripts/check_artifact_gate.py \
   --mode node \
-  --skill noetic-company-profile \
+  --skill cws-company-profile \
   --handoff <path>/handoff.json \
   --run-id <run-id> \
   [--plugin-root .]
 
 python3 scripts/check_artifact_gate.py \
   --mode final \
-  --skill noetic-due-diligence \
+  --skill cws-due-diligence \
   --run-dir <company-kb> \
   --run-id <run-id> \
   [--plugin-root .]
@@ -245,7 +245,7 @@ python3 scripts/check_artifact_gate.py \
 
 ## 7. Agent 侧约定
 
-更新 `noetic-data-agent`（及试点业务 skill 如需要）执行规则：
+更新 `cws-data-agent`（及试点业务 skill 如需要）执行规则：
 
 1. 先写 `<run-id>` 隔离目录下的 `handoff.json`（+ 可选 `report.md`），并在顶层写入相同 `run_id`
 2. 再运行 `check_artifact_gate.py --mode node ...`
@@ -282,8 +282,8 @@ python3 scripts/check_artifact_gate.py \
 
 1. 定义 `gate` 解析与共享白名单/枚举
 2. 实现 `check_artifact_gate.py`（node 完整；final 最小/可 skip）
-3. 为 `noetic-company-profile/card.yaml` 增加 `gate`
-4. 更新 `noetic-data-agent`（必要时业务 skill）的先写后检约定
+3. 为 `cws-company-profile/card.yaml` 增加 `gate`
+4. 更新 `cws-data-agent`（必要时业务 skill）的先写后检约定
 5. 扩展 `validate_work_suite` + fixture 测试
 6. 为尽调和投资分析报告 card 声明 final gate，并由 workflow 任务正文传递 run-id、node/final 命令
 7. 更新 `AGENTS.md` 与相关 docs：有 `gate` 的编排节点必须过脚本

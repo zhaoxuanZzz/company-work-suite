@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate, create, and execute Noetic skill workflows."""
+"""Validate, create, and execute CWS skill workflows."""
 
 from __future__ import annotations
 
@@ -28,7 +28,7 @@ from workflow_planning import artifact_root, build_task_plan, company_kb_root
 
 
 ROOT = Path(__file__).resolve().parents[3]
-DEFAULT_KANBAN_RUNS_DIR = Path.home() / ".noeticai" / "kanban-runs"
+DEFAULT_KANBAN_RUNS_DIR = Path.home() / ".cws" / "kanban-runs"
 def command_validate(args: argparse.Namespace) -> int:
     stages = validate_skill_workflow(args.skill)
     print(f"OK: {args.skill} workflow ({len(stages)} stages)")
@@ -65,7 +65,7 @@ def resolve_run_id(company: str, requested: str | None) -> str:
 
 
 def kanban_runs_root() -> Path:
-    override = os.environ.get("NOETICAI_KANBAN_RUNS_DIR", "").strip()
+    override = os.environ.get("CWS_KANBAN_RUNS_DIR", "").strip()
     return Path(override).expanduser() if override else DEFAULT_KANBAN_RUNS_DIR
 
 
@@ -98,13 +98,13 @@ def build_triage_plan(company: str, skill_hint: str | None) -> TriagePlan:
     label = skill_hint or "workflow"
     hint = skill_hint or "由编排器根据需求判断"
     return TriagePlan(
-        title=f"[Noetic] {company} / {label}",
+        title=f"[CWS] {company} / {label}",
         body=f"""目标公司：{company}
 编排型 skill 提示：{hint}
 期望交付：企业尽调或投资分析类结构化报告（含 evidence_gaps）
 
 要求：
-- 按 Noetic 知识卡片拆分前置 data agent 任务与最终 gen 报告任务
+- 按 CWS 知识卡片拆分前置 data agent 任务与最终 gen 报告任务
 - 不指定 assignee，使用 Hermes 默认 agent 承接任务
 - 用角色 skill 区分 data / gen 职责
 - 子任务需声明输入/输出 artifact 与依赖关系
@@ -215,7 +215,7 @@ def command_execute_planned(args: argparse.Namespace) -> int:
     tasks = build_task_plan(args.skill, args.company, workspace, run_id)
     resolved_ids: dict[str, str] = {}
 
-    print(f"Noetic workflow execution plan: {args.skill} ({len(tasks)} tasks)")
+    print(f"CWS workflow execution plan: {args.skill} ({len(tasks)} tasks)")
     print(f"workspace: {workspace}")
     print(f"run_id: {run_id}")
     for task in tasks:
@@ -244,7 +244,7 @@ def command_execute_auto(args: argparse.Namespace) -> int:
     workspace = resolve_workspace(args.company, args.tenant, args.workspace)
     plan = build_triage_plan(args.company, args.skill)
 
-    print(f"Noetic workflow auto triage: {args.company}")
+    print(f"CWS workflow auto triage: {args.company}")
     print(f"- entry hint: {args.skill or 'none'}")
     print(f"workspace: {workspace}")
     print("gate: auto mode does not guarantee static workflow gate compliance")
@@ -283,7 +283,7 @@ def command_execute_delegate(args: argparse.Namespace) -> int:
         "company": args.company,
         "workspace": workspace,
         "run_id": run_id,
-        "instructions": "Delegate ready nodes to subagents using node.required_skills. Data nodes must include both noetic-data-agent and noetic-karpathy-llm-wiki; report nodes use noetic-gen-agent. A node is ready only after every parent handoff is available and its node gate passed. The report node must run the final gate after its node gate. If subagents are unavailable, run nodes in the current agent in dependency order.",
+        "instructions": "Delegate ready nodes to subagents using node.required_skills. Data nodes must include both cws-data-agent and cws-karpathy-llm-wiki; report nodes use cws-gen-agent. A node is ready only after every parent handoff is available and its node gate passed. The report node must run the final gate after its node gate. If subagents are unavailable, run nodes in the current agent in dependency order.",
         "nodes": structured_delegate_nodes(args.skill, run_id, tasks),
         "edges": [{"from": parent, "to": task.task_id} for task in tasks for parent in task.parents],
     }
@@ -402,7 +402,7 @@ def command_execute(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Noetic workflow helper")
+    parser = argparse.ArgumentParser(description="CWS workflow helper")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate = subparsers.add_parser("validate")
@@ -419,7 +419,7 @@ def build_parser() -> argparse.ArgumentParser:
     compile_parser.add_argument("--skill", required=True)
     compile_parser.add_argument("--company", required=True)
     compile_parser.add_argument("--tenant", help="Hermes Kanban tenant namespace for this workflow batch")
-    compile_parser.add_argument("--workspace", help="Hermes workspace; default ~/.noeticai/kanban-runs/<tenant>")
+    compile_parser.add_argument("--workspace", help="Hermes workspace; default ~/.cws/kanban-runs/<tenant>")
     compile_parser.add_argument("--run-id", help="Artifact run namespace; generated when omitted")
     compile_parser.set_defaults(func=command_compile)
 
@@ -429,7 +429,7 @@ def build_parser() -> argparse.ArgumentParser:
     execute.add_argument("--company", required=True)
     execute.add_argument(
         "--workspace",
-        help="Hermes workspace; default dir:~/.noeticai/kanban-runs/<tenant>",
+        help="Hermes workspace; default dir:~/.cws/kanban-runs/<tenant>",
     )
     execute.add_argument("--tenant", help="Hermes Kanban tenant namespace for this workflow batch")
     execute.add_argument("--run-id", help="Artifact run namespace; generated for planned/delegate when omitted")

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Verify local Hermes install of noeticai-knowledge and its MCP servers."""
+"""Verify local Hermes install of company-work-suite and its MCP servers."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
-PLUGIN_NAME = "noeticai-knowledge"
+PLUGIN_NAME = "company-work-suite"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
 SCRIPTS_DIR = PLUGIN_ROOT / "scripts"
 
@@ -231,7 +231,7 @@ def check_mcp_live(
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Verify Hermes local install of noeticai-knowledge and MCP.",
+        description="Verify Hermes local install of company-work-suite and MCP.",
     )
     parser.add_argument(
         "--skip-live",

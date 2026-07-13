@@ -57,9 +57,9 @@ delegate init
 {
   "id": "company-profile",
   "stage": "profile",
-  "skill": "noetic-company-profile",
+  "skill": "cws-company-profile",
   "parents": [],
-  "handoff_path": "/company-kb/artifacts/run-xxx/noetic-company-profile/handoff.json",
+  "handoff_path": "/company-kb/artifacts/run-xxx/cws-company-profile/handoff.json",
   "node_gate": {
     "mode": "node",
     "run_id": "run-xxx"
@@ -104,15 +104,15 @@ blocked -> validating
 {
   "schema_version": 1,
   "run_id": "run-xxx",
-  "workflow_skill": "noetic-due-diligence",
+  "workflow_skill": "cws-due-diligence",
   "status": "running",
   "nodes": {
     "company-profile": {
-      "skill": "noetic-company-profile",
+      "skill": "cws-company-profile",
       "status": "passed",
       "attempt": 1,
-      "handoff_path": "/company-kb/artifacts/run-xxx/noetic-company-profile/handoff.json",
-      "gate_result_path": "/company-kb/artifacts/run-xxx/noetic-company-profile/gate-result.json"
+      "handoff_path": "/company-kb/artifacts/run-xxx/cws-company-profile/handoff.json",
+      "gate_result_path": "/company-kb/artifacts/run-xxx/cws-company-profile/gate-result.json"
     }
   }
 }
@@ -124,27 +124,27 @@ blocked -> validating
 
 ```bash
 # 固化 workflow DAG 并创建状态
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate init \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate init \
   --skill <orchestrating-skill> --company <company> [--run-id <id>]
 
 # 返回当前允许领取的节点
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate ready \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate ready \
   --run-id <id>
 
 # 领取节点并将其迁移为 running
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate start \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate start \
   --run-id <id> --node <node-id>
 
 # 子代理返回后，由 runner 亲自验收
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate complete \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate complete \
   --run-id <id> --node <node-id>
 
 # 记录子代理执行失败，使节点可以重试
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate fail \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate fail \
   --run-id <id> --node <node-id> --reason <reason>
 
 # 查看整体状态、ready 节点和阻塞原因
-python3 skills/noetic-workflow/scripts/noetic_workflow.py delegate status \
+python3 skills/cws-workflow/scripts/workflow_cli.py delegate status \
   --run-id <id>
 ```
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the NoeticAI plugin static contract."""
+"""Validate the Company Work Suite plugin static contract."""
 
 from __future__ import annotations
 

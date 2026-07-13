@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Integration checks for the Noetic workflow Hermes backend."""
+"""Integration checks for the CWS workflow Hermes backend."""
 
 from __future__ import annotations
 
@@ -14,10 +14,10 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills" / "noetic-workflow" / "scripts" / "noetic_workflow.py"
+SCRIPT = ROOT / "skills" / "cws-workflow" / "scripts" / "workflow_cli.py"
 VALIDATOR = ROOT / "scripts" / "validate_work_suite.py"
 REAL_COMPANIES = ROOT / "tests" / "fixtures" / "real_companies.txt"
-ROLE_HOOK = ROOT / "hooks" / "noetic_role_routing.py"
+ROLE_HOOK = ROOT / "hooks" / "role_routing.py"
 
 
 def run_command(*args: str, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
@@ -31,7 +31,7 @@ def run_command(*args: str, env: dict[str, str] | None = None) -> subprocess.Com
     )
 
 
-class NoeticWorkflowIntegrationTest(unittest.TestCase):
+class WorkflowIntegrationTest(unittest.TestCase):
     def test_real_company_fixture_has_ten_names(self) -> None:
         companies = real_companies()
         self.assertEqual(10, len(companies))
@@ -58,20 +58,20 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
                 else:
                     os.environ["HERMES_HOME"] = previous
 
-        self.assertIn("noetic-due-diligence", ctx.skills)
-        self.assertIn("noetic-due-diligence", ctx.commands)
-        self.assertIn("企业尽调", ctx.command_descriptions["noetic-due-diligence"])
-        self.assertIn("基于企业画像", ctx.command_descriptions["noetic-due-diligence"])
-        self.assertIn("输入公司名称", ctx.command_args_hints["noetic-due-diligence"])
-        command_prompt = ctx.commands["noetic-due-diligence"]("杭州XX科技有限公司")
-        self.assertIn("`noeticai-knowledge:noetic-due-diligence`", command_prompt)
-        self.assertIn("noetic-data-agent", command_prompt)
-        self.assertIn("noetic-gen-agent", command_prompt)
+        self.assertIn("cws-due-diligence", ctx.skills)
+        self.assertIn("cws-due-diligence", ctx.commands)
+        self.assertIn("企业尽调", ctx.command_descriptions["cws-due-diligence"])
+        self.assertIn("基于企业画像", ctx.command_descriptions["cws-due-diligence"])
+        self.assertIn("输入公司名称", ctx.command_args_hints["cws-due-diligence"])
+        command_prompt = ctx.commands["cws-due-diligence"]("杭州XX科技有限公司")
+        self.assertIn("`company-work-suite:cws-due-diligence`", command_prompt)
+        self.assertIn("cws-data-agent", command_prompt)
+        self.assertIn("cws-gen-agent", command_prompt)
         self.assertIn("杭州XX科技有限公司", command_prompt)
 
-        rewrite = ctx.hooks["pre_gateway_dispatch"](event=FakeEvent("/noetic-due-diligence 杭州XX科技有限公司"))
+        rewrite = ctx.hooks["pre_gateway_dispatch"](event=FakeEvent("/cws-due-diligence 杭州XX科技有限公司"))
         self.assertEqual("rewrite", rewrite["action"])
-        self.assertIn("`noeticai-knowledge:noetic-due-diligence`", rewrite["text"])
+        self.assertIn("`company-work-suite:cws-due-diligence`", rewrite["text"])
         self.assertIn("route work through role skills", rewrite["text"])
 
         self.assertIsNone(ctx.hooks["pre_gateway_dispatch"](event=FakeEvent("/unknown")))
@@ -87,7 +87,7 @@ class NoeticWorkflowIntegrationTest(unittest.TestCase):
   default: demo
 plugins:
   enabled:
-  - noeticai-knowledge
+  - company-work-suite
   disabled: []
 mcp_servers:
   other-server:
@@ -106,7 +106,7 @@ extra_top_level: keep-me
 
             text = config_path.read_text(encoding="utf-8")
             self.assertIn("extra_top_level: keep-me", text)
-            self.assertIn("- noeticai-knowledge", text)
+            self.assertIn("- company-work-suite", text)
             self.assertIn("default: demo", text)
 
             data = helper._load_yaml(config_path)
@@ -132,10 +132,10 @@ extra_top_level: keep-me
             changed_again = helper.ensure_hermes_mcp(plugin_root=ROOT, home=home)
             self.assertFalse(changed_again)
 
-    def test_codex_role_hook_injects_only_for_noetic_prompts(self) -> None:
+    def test_codex_role_hook_injects_only_for_cws_prompts(self) -> None:
         result = subprocess.run(
             [sys.executable, str(ROLE_HOOK)],
-            input=json.dumps({"prompt": "Use noeticai-knowledge to prepare a report"}),
+            input=json.dumps({"prompt": "Use company-work-suite to prepare a report"}),
             cwd=ROOT,
             text=True,
             capture_output=True,
@@ -143,10 +143,10 @@ extra_top_level: keep-me
         )
         output = json.loads(result.stdout)
         context = output["hookSpecificOutput"]["additionalContext"]
-        self.assertEqual("NOETIC:ROLE_ROUTING", output["systemMessage"])
+        self.assertEqual("CWS:ROLE_ROUTING", output["systemMessage"])
         self.assertEqual("UserPromptSubmit", output["hookSpecificOutput"]["hookEventName"])
-        self.assertIn("noetic-data-agent", context)
-        self.assertIn("noetic-gen-agent", context)
+        self.assertIn("cws-data-agent", context)
+        self.assertIn("cws-gen-agent", context)
         self.assertNotIn("company", context.lower())
         self.assertNotIn("qcc", context.lower())
 
@@ -158,7 +158,7 @@ extra_top_level: keep-me
             capture_output=True,
             check=True,
         )
-        self.assertIn("NOETIC:ROLE_ROUTING", result.stdout)
+        self.assertIn("CWS:ROLE_ROUTING", result.stdout)
 
         result = subprocess.run(
             [sys.executable, str(ROLE_HOOK)],
@@ -171,7 +171,7 @@ extra_top_level: keep-me
         self.assertEqual("", result.stdout)
 
     def test_entry_workflows_validate(self) -> None:
-        for skill in ("noetic-due-diligence", "noetic-investment-analysis"):
+        for skill in ("cws-due-diligence", "cws-investment-analysis"):
             with self.subTest(skill=skill):
                 result = run_command(str(SCRIPT), "validate", "--skill", skill)
                 self.assertIn(f"OK: {skill} workflow (3 stages)", result.stdout)
@@ -183,20 +183,20 @@ extra_top_level: keep-me
             "--mode",
             "planned",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--company",
             "杭州XX科技有限公司",
             "--workspace",
-            "dir:/tmp/noetic-run",
+            "dir:/tmp/cws-run",
             "--dry-run",
         )
 
-        self.assertIn("Noetic workflow execution plan: noetic-due-diligence (5 tasks)", result.stdout)
-        self.assertIn("task1: data noetic-company-profile parents=[] outputs=['company_profile']", result.stdout)
-        self.assertIn("task2: data noetic-shareholder-structure parents=['task1']", result.stdout)
-        self.assertIn("task3: data noetic-litigation-risk parents=['task1']", result.stdout)
-        self.assertIn("task4: data noetic-financing-history parents=['task1']", result.stdout)
-        self.assertIn("task5: gen noetic-due-diligence parents=['task1', 'task2', 'task3', 'task4']", result.stdout)
+        self.assertIn("CWS workflow execution plan: cws-due-diligence (5 tasks)", result.stdout)
+        self.assertIn("task1: data cws-company-profile parents=[] outputs=['company_profile']", result.stdout)
+        self.assertIn("task2: data cws-shareholder-structure parents=['task1']", result.stdout)
+        self.assertIn("task3: data cws-litigation-risk parents=['task1']", result.stdout)
+        self.assertIn("task4: data cws-financing-history parents=['task1']", result.stdout)
+        self.assertIn("task5: gen cws-due-diligence parents=['task1', 'task2', 'task3', 'task4']", result.stdout)
         self.assertNotIn("--assignee", result.stdout)
 
     def test_compile_outputs_dag_json_without_hermes_commands(self) -> None:
@@ -204,20 +204,20 @@ extra_top_level: keep-me
             str(SCRIPT),
             "compile",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--company",
             "杭州XX科技有限公司",
             "--workspace",
-            "dir:/tmp/noetic-run",
+            "dir:/tmp/cws-run",
         )
         graph = json.loads(result.stdout)
 
-        self.assertEqual("noetic-due-diligence", graph["skill"])
+        self.assertEqual("cws-due-diligence", graph["skill"])
         self.assertEqual(5, len(graph["nodes"]))
         self.assertEqual("data", graph["nodes"][0]["role"])
-        self.assertEqual("noetic-data-agent", graph["nodes"][0]["role_skill"])
+        self.assertEqual("cws-data-agent", graph["nodes"][0]["role_skill"])
         self.assertEqual("gen", graph["nodes"][4]["role"])
-        self.assertEqual("noetic-gen-agent", graph["nodes"][4]["role_skill"])
+        self.assertEqual("cws-gen-agent", graph["nodes"][4]["role_skill"])
         self.assertNotIn("assignee", graph["nodes"][0])
         self.assertEqual(
             [
@@ -240,31 +240,31 @@ extra_top_level: keep-me
             "--mode",
             "delegate",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--company",
             "杭州XX科技有限公司",
             "--workspace",
-            "dir:/tmp/noetic-run",
+            "dir:/tmp/cws-run",
         )
         graph = json.loads(result.stdout)
 
         self.assertEqual("delegate", graph["mode"])
-        self.assertEqual("noetic-due-diligence", graph["skill"])
+        self.assertEqual("cws-due-diligence", graph["skill"])
         self.assertEqual(5, len(graph["nodes"]))
-        self.assertEqual("noetic-company-profile", graph["nodes"][0]["skill"])
+        self.assertEqual("cws-company-profile", graph["nodes"][0]["skill"])
         self.assertEqual("data", graph["nodes"][0]["role"])
-        self.assertEqual("noetic-data-agent", graph["nodes"][0]["role_skill"])
-        self.assertEqual(["noetic-data-agent", "noetic-karpathy-llm-wiki"], graph["nodes"][0]["required_skills"])
-        self.assertIn("执行 Noetic 知识卡片：noetic-company-profile", graph["nodes"][0]["prompt"])
-        self.assertIn("必需搭配 skill：noetic-karpathy-llm-wiki", graph["nodes"][0]["prompt"])
+        self.assertEqual("cws-data-agent", graph["nodes"][0]["role_skill"])
+        self.assertEqual(["cws-data-agent", "cws-karpathy-llm-wiki"], graph["nodes"][0]["required_skills"])
+        self.assertIn("执行 CWS 知识卡片：cws-company-profile", graph["nodes"][0]["prompt"])
+        self.assertIn("必需搭配 skill：cws-karpathy-llm-wiki", graph["nodes"][0]["prompt"])
         self.assertEqual(["task1", "task2", "task3", "task4"], graph["nodes"][4]["parents"])
         self.assertEqual("gen", graph["nodes"][4]["role"])
-        self.assertEqual("noetic-gen-agent", graph["nodes"][4]["role_skill"])
-        self.assertEqual(["noetic-gen-agent"], graph["nodes"][4]["required_skills"])
-        self.assertTrue(graph["nodes"][0]["handoff_path"].endswith("noetic-company-profile/handoff.json"))
+        self.assertEqual("cws-gen-agent", graph["nodes"][4]["role_skill"])
+        self.assertEqual(["cws-gen-agent"], graph["nodes"][4]["required_skills"])
+        self.assertTrue(graph["nodes"][0]["handoff_path"].endswith("cws-company-profile/handoff.json"))
         self.assertEqual("node", graph["nodes"][0]["node_gate"]["mode"])
         self.assertIsNone(graph["nodes"][0]["final_gate"])
-        self.assertEqual("noetic-due-diligence", graph["nodes"][4]["final_gate"]["skill"])
+        self.assertEqual("cws-due-diligence", graph["nodes"][4]["final_gate"]["skill"])
         self.assertNotIn("assignee", graph["nodes"][0])
         self.assertNotIn("hermes kanban create", result.stdout)
 
@@ -272,14 +272,14 @@ extra_top_level: keep-me
         with tempfile.TemporaryDirectory() as temp:
             company_kb = Path(temp) / "company-kb"
             env = os.environ.copy()
-            env["NOETICAI_COMPANY_KB_DIR"] = str(company_kb)
+            env["CWS_COMPANY_KB_DIR"] = str(company_kb)
             result = run_command(
                 str(SCRIPT),
                 "execute",
                 "--mode",
                 "delegate",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--run-id",
@@ -289,13 +289,13 @@ extra_top_level: keep-me
         graph = json.loads(result.stdout)
         self.assertEqual("run-gate-test", graph["run_id"])
         self.assertIn("--run-id run-gate-test", graph["nodes"][0]["prompt"])
-        self.assertIn("artifacts/run-gate-test/noetic-company-profile/handoff.json", graph["nodes"][0]["prompt"])
+        self.assertIn("artifacts/run-gate-test/cws-company-profile/handoff.json", graph["nodes"][0]["prompt"])
         self.assertIn("--mode final", graph["nodes"][4]["prompt"])
         self.assertIn("--run-id run-gate-test", graph["nodes"][4]["prompt"])
 
     def test_real_company_names_dry_run_for_all_entry_workflows(self) -> None:
         for company in real_companies():
-            for skill in ("noetic-due-diligence", "noetic-investment-analysis"):
+            for skill in ("cws-due-diligence", "cws-investment-analysis"):
                 with self.subTest(company=company, skill=skill):
                     result = run_command(
                         str(SCRIPT),
@@ -307,11 +307,11 @@ extra_top_level: keep-me
                         "--company",
                         company,
                         "--workspace",
-                        "dir:/tmp/noetic-run",
+                        "dir:/tmp/cws-run",
                         "--dry-run",
                     )
-                    self.assertIn(f"Noetic workflow execution plan: {skill} (5 tasks)", result.stdout)
-                    self.assertIn(f"[Noetic] {company} / profile / noetic-company-profile", result.stdout)
+                    self.assertIn(f"CWS workflow execution plan: {skill} (5 tasks)", result.stdout)
+                    self.assertIn(f"[CWS] {company} / profile / cws-company-profile", result.stdout)
 
     def test_apply_uses_real_hermes_ids_for_parent_links(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
@@ -328,11 +328,11 @@ extra_top_level: keep-me
                 "--mode",
                 "planned",
                 "--skill",
-                "noetic-investment-analysis",
+                "cws-investment-analysis",
                 "--company",
                 "杭州XX科技有限公司",
                 "--workspace",
-                "dir:/tmp/noetic-run",
+                "dir:/tmp/cws-run",
                 "--apply",
                 env=env,
             )
@@ -340,7 +340,7 @@ extra_top_level: keep-me
             self.assertIn("created task5: h5", result.stdout)
             calls = [json.loads(line)["argv"] for line in log_path.read_text(encoding="utf-8").splitlines()]
             self.assertEqual(5, len(calls))
-            self.assertEqual("noetic-company-profile", calls[0][calls[0].index("--skill") + 1])
+            self.assertEqual("cws-company-profile", calls[0][calls[0].index("--skill") + 1])
             self.assertTrue(all("--assignee" not in call for call in calls))
             self.assertNotIn("--parent", calls[0])
             self.assertEqual(["h1"], parent_values(calls[1]))
@@ -356,14 +356,14 @@ extra_top_level: keep-me
             write_fake_hermes(fake_hermes, log_path)
             env = os.environ.copy()
             env["PATH"] = f"{temp_path}{os.pathsep}{env.get('PATH', '')}"
-            env["NOETICAI_COMPANY_KB_DIR"] = str(temp_path / "company-kb")
+            env["CWS_COMPANY_KB_DIR"] = str(temp_path / "company-kb")
             result = run_command(
                 str(SCRIPT),
                 "execute",
                 "--mode",
                 "planned",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--run-id",
@@ -392,11 +392,11 @@ extra_top_level: keep-me
                 "--mode",
                 "planned",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--workspace",
-                "dir:/tmp/noetic-run",
+                "dir:/tmp/cws-run",
                 "--tenant",
                 "batch-20260703-hzxx",
                 "--apply",
@@ -424,11 +424,11 @@ extra_top_level: keep-me
                         "--mode",
                         "planned",
                         "--skill",
-                        "noetic-due-diligence",
+                        "cws-due-diligence",
                         "--company",
                         company,
                         "--workspace",
-                        "dir:/tmp/noetic-run",
+                        "dir:/tmp/cws-run",
                         "--apply",
                         env=env,
                     )
@@ -455,11 +455,11 @@ extra_top_level: keep-me
             "--company",
             "小米科技有限责任公司",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--dry-run",
         )
 
-        self.assertIn("Noetic workflow auto triage: 小米科技有限责任公司", result.stdout)
+        self.assertIn("CWS workflow auto triage: 小米科技有限责任公司", result.stdout)
         self.assertIn("--triage", result.stdout)
         self.assertNotIn("--assignee", result.stdout)
         self.assertEqual(1, result.stdout.count("hermes kanban create"))
@@ -482,7 +482,7 @@ extra_top_level: keep-me
                 "--company",
                 "小米科技有限责任公司",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--apply",
                 env=env,
             )
@@ -512,7 +512,7 @@ extra_top_level: keep-me
                 "--company",
                 "小米科技有限责任公司",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--tenant",
                 "batch-xiaomi",
                 "--apply",
@@ -556,11 +556,11 @@ extra_top_level: keep-me
                 str(SCRIPT),
                 "execute",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--workspace",
-                "dir:/tmp/noetic-run",
+                "dir:/tmp/cws-run",
             ],
             cwd=ROOT,
             text=True,
@@ -570,18 +570,18 @@ extra_top_level: keep-me
         self.assertNotEqual(0, result.returncode)
         self.assertIn("the following arguments are required: --mode", result.stderr)
 
-    def test_planned_default_workspace_under_noeticai(self) -> None:
+    def test_planned_default_workspace_under_cws(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             runs_root = Path(temp) / "kanban-runs"
             env = os.environ.copy()
-            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            env["CWS_KANBAN_RUNS_DIR"] = str(runs_root)
             result = run_command(
                 str(SCRIPT),
                 "execute",
                 "--mode",
                 "planned",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--tenant",
@@ -594,11 +594,11 @@ extra_top_level: keep-me
             self.assertIn(f"workspace: {expected}", result.stdout)
             self.assertIn(f"--workspace {expected}", result.stdout)
 
-    def test_auto_default_workspace_under_noeticai(self) -> None:
+    def test_auto_default_workspace_under_cws(self) -> None:
         with tempfile.TemporaryDirectory() as temp:
             runs_root = Path(temp) / "kanban-runs"
             env = os.environ.copy()
-            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            env["CWS_KANBAN_RUNS_DIR"] = str(runs_root)
             result = run_command(
                 str(SCRIPT),
                 "execute",
@@ -625,7 +625,7 @@ extra_top_level: keep-me
             write_fake_hermes(fake_hermes, log_path)
 
             env = os.environ.copy()
-            env["NOETICAI_KANBAN_RUNS_DIR"] = str(runs_root)
+            env["CWS_KANBAN_RUNS_DIR"] = str(runs_root)
             env["PATH"] = f"{temp_path}{os.pathsep}{env.get('PATH', '')}"
             run_command(
                 str(SCRIPT),
@@ -633,7 +633,7 @@ extra_top_level: keep-me
                 "--mode",
                 "planned",
                 "--skill",
-                "noetic-due-diligence",
+                "cws-due-diligence",
                 "--company",
                 "杭州XX科技有限公司",
                 "--tenant",
@@ -654,7 +654,7 @@ def real_companies() -> list[str]:
 
 
 def load_plugin():
-    spec = importlib.util.spec_from_file_location("noeticai_knowledge_plugin", ROOT / "__init__.py")
+    spec = importlib.util.spec_from_file_location("cws_knowledge_plugin", ROOT / "__init__.py")
     if spec is None or spec.loader is None:
         raise RuntimeError("cannot load plugin")
     module = importlib.util.module_from_spec(spec)

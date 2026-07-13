@@ -1,5 +1,5 @@
 ---
-name: noetic-shareholder-structure
+name: cws-shareholder-structure
 displayName: 股权结构分析
 description: 输入公司名称，分析股东结构、实控人、持股链路和股权异常信号。
 argument-hint: "输入公司名称，如：杭州XX科技有限公司"

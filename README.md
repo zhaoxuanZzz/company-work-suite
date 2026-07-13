@@ -1,6 +1,6 @@
-# NoeticAI 知识卡片 Work Suite
+# 企业研究 Work Suite
 
-将 noeticai 项目中的企业知识卡片整理为可被 Hermes、Codex、Qoder 等平台加载的 skills 插件。
+将企业知识卡片整理为可被 Hermes、Codex、Qoder 等平台加载的 skills 插件。
 
 > **免责声明：** 本套件输出仅用于研究和决策辅助，不替代正式尽职调查、法律意见或投资建议。
 
@@ -21,16 +21,16 @@
 
 | Skill | Workflow |
 |----------|------|
-| 企业尽调 | [skills/noetic-due-diligence/references/workflow.yaml](./skills/noetic-due-diligence/references/workflow.yaml) |
-| 投资分析 | [skills/noetic-investment-analysis/references/workflow.yaml](./skills/noetic-investment-analysis/references/workflow.yaml) |
+| 企业尽调 | [skills/cws-due-diligence/references/workflow.yaml](./skills/cws-due-diligence/references/workflow.yaml) |
+| 投资分析 | [skills/cws-investment-analysis/references/workflow.yaml](./skills/cws-investment-analysis/references/workflow.yaml) |
 
 ## 企业数据查询策略
 
 每个企业类业务技能直接读取自己的 `card.yaml.data_needs`，先检索企业信息库 wiki，再按缺口补齐公开企业信息。
 
-企业信息库默认位于 `~/.noeticai/company-knowledge`，可通过 `NOETICAI_COMPANY_KB_DIR` 覆盖。只有 wiki 无命中、主体不确定、字段缺失，或信息明显过期时，才补齐公开企业信息。
+企业信息库默认位于 `~/.cws/company-knowledge`，可通过 `CWS_COMPANY_KB_DIR` 覆盖。只有 wiki 无命中、主体不确定、字段缺失，或信息明显过期时，才补齐公开企业信息。
 
-补齐后，完整结果写入企业信息库 `raw/`，再按 `noetic-karpathy-llm-wiki` Ingest 流程整理进 `wiki/`。每个业务技能最终标注企业 wiki 写回状态。插件仓库只保存能力和规则，不保存具体企业数据。
+补齐后，完整结果写入企业信息库 `raw/`，再按 `cws-karpathy-llm-wiki` Ingest 流程整理进 `wiki/`。每个业务技能最终标注企业 wiki 写回状态。插件仓库只保存能力和规则，不保存具体企业数据。
 
 ## 开发
 
@@ -46,7 +46,7 @@ make deploy-local
 make verify-hermes
 ```
 
-详细方案见 [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-plan.md)，调研情况见 [docs/pluginization-research.md](./docs/pluginization-research.md)。
+详细方案见 [docs/company-work-suite-plugin-plan.md](./docs/company-work-suite-plugin-plan.md)，调研情况见 [docs/pluginization-research.md](./docs/pluginization-research.md)。
 
 静态校验：
 
@@ -65,8 +65,8 @@ python3 scripts/validate_work_suite.py .
 │   ├── {skill-name}/SKILL.md        # 卡片执行说明
 │   ├── {skill-name}/card.yaml       # 卡片结构化元数据
 │   ├── {orchestrating-skill}/references/workflow.yaml
-│   └── noetic-karpathy-llm-wiki/       # LLM Wiki 技能
+│   └── cws-karpathy-llm-wiki/       # LLM Wiki 技能
 ├── CONNECTORS.md
 ├── docs/WORK_SUITE_WORKFLOW.md
-└── docs/noeticai-knowledge-plugin-plan.md
+└── docs/company-work-suite-plugin-plan.md
 ```

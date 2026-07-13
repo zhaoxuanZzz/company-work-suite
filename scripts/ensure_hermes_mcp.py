@@ -12,7 +12,7 @@ from typing import Any
 
 AUTH_VALUE = "Bearer ${QCC_MCP_TOKEN}"
 PLUGIN_ROOT = Path(__file__).resolve().parent.parent
-LOGGER = logging.getLogger("noeticai.ensure_hermes_mcp")
+LOGGER = logging.getLogger("cws.ensure_hermes_mcp")
 
 
 def hermes_home() -> Path:

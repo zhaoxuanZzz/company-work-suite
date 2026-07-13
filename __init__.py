@@ -4,12 +4,12 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
-PLUGIN_NAME = "noeticai-knowledge"
+PLUGIN_NAME = "company-work-suite"
 PLUGIN_DIR = Path(__file__).parent
 SKILLS_DIR = PLUGIN_DIR / "skills"
-ROLE_ROUTING = """When using the NoeticAI Knowledge plugin, route work through role skills:
-- `noetic-data-agent`: prepares and verifies prerequisite information.
-- `noetic-gen-agent`: synthesizes prepared information into final deliverables.
+ROLE_ROUTING = """When using the Company Work Suite plugin, route work through role skills:
+- `cws-data-agent`: prepares and verifies prerequisite information.
+- `cws-gen-agent`: synthesizes prepared information into final deliverables.
 
 Use data first when facts or context are missing; use gen when producing the final answer."""
 
@@ -42,7 +42,7 @@ def _command_description(skill_md: Path, command: str) -> str:
     description = _frontmatter_value(skill_md, "description")
     if display and description:
         return f"{display}：{description}"
-    return description or display or f"Load NoeticAI skill {command}."
+    return description or display or f"Load Company Work Suite skill {command}."
 
 
 def _command_args_hint(skill_md: Path) -> str:
@@ -118,8 +118,8 @@ def register(ctx):
 
     if hasattr(ctx, "register_cli_command"):
         ctx.register_cli_command(
-            name="noetic-gate",
-            help="Retry or waive a blocked Noetic Kanban gate",
+            name="cws-gate",
+            help="Retry or waive a blocked CWS Kanban gate",
             setup_fn=_setup_gate_cli,
             handler_fn=_run_gate_cli,
         )
@@ -157,9 +157,9 @@ def _gate_before_kanban_complete(tool_name: str = "", args: Any = None, task_id:
             return None
         result = _gate_module().gate_completion(task_id, task.body, board=board)
         if result and result["status"] == "blocked":
-            return {"action": "block", "message": "Noetic gate blocked completion: " + "; ".join(result["errors"]) + ". A human must run `hermes noetic-gate retry` after repair or `hermes noetic-gate waive --reason ...`."}
+            return {"action": "block", "message": "CWS gate blocked completion: " + "; ".join(result["errors"]) + ". A human must run `hermes cws-gate retry` after repair or `hermes cws-gate waive --reason ...`."}
     except Exception as exc:
-        return {"action": "block", "message": f"Noetic gate failed closed: {exc}"}
+        return {"action": "block", "message": f"CWS gate failed closed: {exc}"}
     return None
 
 

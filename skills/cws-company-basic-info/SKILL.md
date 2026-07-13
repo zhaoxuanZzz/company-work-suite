@@ -1,5 +1,5 @@
 ---
-name: noetic-company-basic-info
+name: cws-company-basic-info
 displayName: 企业基本信息查询
 description: 输入公司名称，快速整理工商基本信息（名称、信用代码、法人、注册资本、成立日期、经营状态、注册地址、经营范围）。用于简单企业信息核对与插件联调测试。只要用户要查企业工商信息、公司登记信息或主体确认，即使用本 skill，即使未明确要求「画像」或「尽调」。
 argument-hint: "输入公司名称，如：杭州XX科技有限公司"

@@ -13,7 +13,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCRIPT = ROOT / "skills" / "noetic-workflow" / "scripts" / "noetic_workflow.py"
+SCRIPT = ROOT / "skills" / "cws-workflow" / "scripts" / "workflow_cli.py"
 PASS_HANDOFF = ROOT / "tests" / "fixtures" / "gates" / "company-profile" / "pass.handoff.json"
 
 
@@ -22,7 +22,7 @@ class DelegateRunnerIntegrationTest(unittest.TestCase):
         self.temporary = tempfile.TemporaryDirectory()
         self.company_kb = Path(self.temporary.name) / "company-kb"
         self.env = os.environ.copy()
-        self.env["NOETICAI_COMPANY_KB_DIR"] = str(self.company_kb)
+        self.env["CWS_COMPANY_KB_DIR"] = str(self.company_kb)
         self.run_id = "run-delegate-test"
 
     def tearDown(self) -> None:
@@ -43,7 +43,7 @@ class DelegateRunnerIntegrationTest(unittest.TestCase):
             "delegate",
             "init",
             "--skill",
-            "noetic-due-diligence",
+            "cws-due-diligence",
             "--company",
             "杭州XX科技有限公司",
             "--run-id",
@@ -61,11 +61,11 @@ class DelegateRunnerIntegrationTest(unittest.TestCase):
         state = json.loads(state_path.read_text(encoding="utf-8"))
         first = state["nodes"]["task1"]
         self.assertEqual("pending", first["status"])
-        self.assertEqual("noetic-company-profile", first["skill"])
+        self.assertEqual("cws-company-profile", first["skill"])
         self.assertEqual(self.run_id, first["node_gate"]["run_id"])
-        self.assertTrue(first["handoff_path"].endswith("noetic-company-profile/handoff.json"))
+        self.assertTrue(first["handoff_path"].endswith("cws-company-profile/handoff.json"))
         self.assertIsNone(first["final_gate"])
-        self.assertEqual("noetic-due-diligence", state["nodes"]["task5"]["final_gate"]["skill"])
+        self.assertEqual("cws-due-diligence", state["nodes"]["task5"]["final_gate"]["skill"])
 
     def test_missing_handoff_blocks_completion_and_keeps_children_pending(self) -> None:
         self.init()
@@ -85,7 +85,7 @@ class DelegateRunnerIntegrationTest(unittest.TestCase):
     def test_passed_gate_unlocks_parallel_children_and_complete_is_idempotent(self) -> None:
         self.init()
         self.run_cli("delegate", "start", "--run-id", self.run_id, "--node", "task1")
-        handoff = self.company_kb / "artifacts" / self.run_id / "noetic-company-profile" / "handoff.json"
+        handoff = self.company_kb / "artifacts" / self.run_id / "cws-company-profile" / "handoff.json"
         handoff.parent.mkdir(parents=True)
         data = json.loads(PASS_HANDOFF.read_text(encoding="utf-8"))
         data["run_id"] = self.run_id
@@ -109,7 +109,7 @@ class DelegateRunnerIntegrationTest(unittest.TestCase):
         blocked = self.run_cli("delegate", "complete", "--run-id", self.run_id, "--node", "task1")
         self.assertEqual(1, blocked.returncode)
 
-        handoff = self.company_kb / "artifacts" / self.run_id / "noetic-company-profile" / "handoff.json"
+        handoff = self.company_kb / "artifacts" / self.run_id / "cws-company-profile" / "handoff.json"
         handoff.parent.mkdir(parents=True, exist_ok=True)
         data = json.loads(PASS_HANDOFF.read_text(encoding="utf-8"))
         data["run_id"] = self.run_id

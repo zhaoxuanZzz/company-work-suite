@@ -1,17 +1,17 @@
-# NoeticAI 知识卡片 Work Suite 改造方案
+# 企业研究 Work Suite 改造方案
 
 > 版本：v0.2 · 更新日期：2026-06-28  
-> 目标：将 noeticai 企业知识卡片整理为 Hermes、Codex、Qoder 等平台兼容的 skills 插件。  
+> 目标：将 企业知识卡片整理为 Hermes、Codex、Qoder 等平台兼容的 skills 插件。  
 > 原则：卡片独立、编排型 skill 内部 workflow 显式编排、产物由 card.yaml 定义、暂不实现 runner。
 
 ## 1. 背景与目标
 
-noeticai 现有知识卡片具备两类能力：
+现有知识卡片具备两类能力：
 
 1. **知识分析能力**：卡片定义输入、分析逻辑、输出结构。
 2. **数据获取能力**：卡片通过 `data_needs` 描述所需外部数据。
 
-本方案将知识卡片迁移为 `noeticai-knowledge` 多平台 skills 插件。迁移后：
+本方案将知识卡片迁移为 `company-work-suite` 多平台 skills 插件。迁移后：
 
 - 每张卡片都是独立 `skill`；需要标准前置流程时，由编排型 skill 的 `references/workflow.yaml` 声明依赖
 - 产物结构与质量约束由各 skill 的 `card.yaml` 和 `SKILL.md` 表达
@@ -22,7 +22,7 @@ noeticai 现有知识卡片具备两类能力：
 ## 2. 目标目录结构
 
 ```text
-noeticai-knowledge/
+company-work-suite/
 ├── .codex-plugin/
 │   └── plugin.json
 ├── .claude-plugin/
@@ -32,24 +32,24 @@ noeticai-knowledge/
 ├── README_EN.md
 ├── CONNECTORS.md
 └── skills/
-    ├── noetic-company-profile/
+    ├── cws-company-profile/
     │   ├── SKILL.md
     │   └── card.yaml
-    ├── noetic-shareholder-structure/
+    ├── cws-shareholder-structure/
     │   ├── SKILL.md
     │   └── card.yaml
-    ├── noetic-litigation-risk/
+    ├── cws-litigation-risk/
     │   ├── SKILL.md
     │   └── card.yaml
-    ├── noetic-financing-history/
+    ├── cws-financing-history/
     │   ├── SKILL.md
     │   └── card.yaml
-    ├── noetic-due-diligence/
+    ├── cws-due-diligence/
         ├── SKILL.md
         ├── card.yaml
         └── references/
             └── workflow.yaml
-    └── noetic-investment-analysis/
+    └── cws-investment-analysis/
         ├── SKILL.md
         ├── card.yaml
         └── references/
@@ -64,11 +64,11 @@ noeticai-knowledge/
 
 ```json
 {
-  "name": "noeticai-knowledge",
+  "name": "company-work-suite",
   "version": "0.1.0",
-  "description": "NoeticAI 企业知识卡片 Work Suite：围绕企业画像、股权结构、司法风险、融资历史和投资分析生成结构化研判。",
+  "description": "企业知识卡片 Work Suite：围绕企业画像、股权结构、司法风险、融资历史和投资分析生成结构化研判。",
   "author": {
-    "name": "NoeticAI"
+    "name": "zhaoxuan"
   },
   "keywords": ["work-suite", "knowledge-card", "company-research"],
   "skills": "./skills/",
@@ -82,10 +82,10 @@ Workflow 自定义语义不写入 `plugin.json`；workflow 放在编排型 skill
 
 原子卡片保持独立，只声明输入、数据需求、输出和分析规则。编排型卡片可以通过 `references/workflow.yaml` 编排前置原子卡片。
 
-`skills/noetic-shareholder-structure/card.yaml` 示例：
+`skills/cws-shareholder-structure/card.yaml` 示例：
 
 ```yaml
-id: noetic-shareholder-structure
+id: cws-shareholder-structure
 name: 股权结构分析
 description: 分析目标企业股东结构、实控人、持股链路和股权异常信号。
 
@@ -112,23 +112,23 @@ outputs:
 
 workflow 只负责编排，不承载具体分析逻辑。v1 使用 `docs/WORK_SUITE_WORKFLOW.md` 中定义的最小 YAML 子集，并放在编排型 skill 内。
 
-`skills/noetic-due-diligence/references/workflow.yaml`：
+`skills/cws-due-diligence/references/workflow.yaml`：
 
 ```yaml
 name: 企业尽调
 stages:
   - id: profile
-    skills: [noetic-company-profile]
+    skills: [cws-company-profile]
     outputs: [company_profile]
 
   - id: analysis
-    skills: [noetic-shareholder-structure, noetic-litigation-risk, noetic-financing-history]
+    skills: [cws-shareholder-structure, cws-litigation-risk, cws-financing-history]
     inputs: [company_profile]
     parallel: true
     outputs: [shareholder_structure, litigation_risk, financing_history]
 
   - id: report
-    skills: [noetic-due-diligence]
+    skills: [cws-due-diligence]
     inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
     outputs: [due_diligence_report]
 ```
@@ -150,7 +150,7 @@ data_needs:
   - 查询企业工商基本信息，包括企业名称、统一社会信用代码、法定代表人、注册资本、成立日期、经营状态、注册地址、经营范围
 ```
 
-`.mcp.json` 保留企查查 MCP companion 配置。业务 skill 只声明 `data_needs`；每个企业类 skill 先检索企业信息库，默认目录为 `~/.noeticai/company-knowledge`，可通过 `NOETICAI_COMPANY_KB_DIR` 覆盖。仅在 wiki 无命中、主体不确定、字段缺失或数据明显过期时，才按缺口补齐公开企业信息。补齐后必须写回企业信息库 `raw/` 和 `wiki/`，并在输出中标注写回状态。不可用或缺失的数据必须列出 `evidence_gaps`，不得编造企业数据。
+`.mcp.json` 保留企查查 MCP companion 配置。业务 skill 只声明 `data_needs`；每个企业类 skill 先检索企业信息库，默认目录为 `~/.cws/company-knowledge`，可通过 `CWS_COMPANY_KB_DIR` 覆盖。仅在 wiki 无命中、主体不确定、字段缺失或数据明显过期时，才按缺口补齐公开企业信息。补齐后必须写回企业信息库 `raw/` 和 `wiki/`，并在输出中标注写回状态。不可用或缺失的数据必须列出 `evidence_gaps`，不得编造企业数据。
 
 ## 7. 验收标准
 
@@ -165,5 +165,5 @@ data_needs:
 - workflow runtime
 - 卡片 DAG 可视化
 - 数据库 schema 迁移
-- noeticai 后端函数兼容层
+- cws 后端函数兼容层
 - MCP 工具名自动映射

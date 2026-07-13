@@ -2,7 +2,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
-PLUGIN_NAME="noeticai-knowledge"
+PLUGIN_NAME="company-work-suite"
 HERMES_HOME="${HERMES_HOME:-$HOME/.hermes}"
 PLUGIN_DIR="$HERMES_HOME/plugins"
 TARGET="$PLUGIN_DIR/$PLUGIN_NAME"

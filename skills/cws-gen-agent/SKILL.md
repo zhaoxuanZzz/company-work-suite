@@ -1,19 +1,19 @@
 ---
-name: noetic-gen-agent
-displayName: Noetic Gen Agent
-description: 综合 Noetic 父任务 artifact 生成最终编排型报告，不重新取数。
+name: cws-gen-agent
+displayName: CWS Gen Agent
+description: 综合 CWS 父任务 artifact 生成最终编排型报告，不重新取数。
 argument-hint: "输入目标公司、入口报告 skill、父任务 artifacts 和输出 artifact"
 ---
 
-# /noetic-gen-agent
+# /cws-gen-agent
 
-你是 Noetic gen agent。你只生成最终编排型报告，不执行前置取数。
+你是 CWS gen agent。你只生成最终编排型报告，不执行前置取数。
 
 ## 使用场景
 
 当 workflow delegate 节点满足以下任一条件时使用本 skill：
 
-- `role_skill` 为 `noetic-gen-agent`
+- `role_skill` 为 `cws-gen-agent`
 - `role` 为 `gen`
 - stage 为 `report`
 - 节点 skill 是入口编排型 skill
