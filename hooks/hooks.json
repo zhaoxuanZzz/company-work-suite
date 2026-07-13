@@ -1,0 +1,1 @@
+{"hooks":{"UserPromptSubmit":[{"type":"command","command":"python3 \"${CODEX_PLUGIN_ROOT}/hooks/role_routing.py\""}]}}

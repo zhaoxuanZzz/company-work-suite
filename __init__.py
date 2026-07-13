@@ -1,11 +1,17 @@
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any, Callable
 
-PLUGIN_NAME = "noeticai-knowledge"
+PLUGIN_NAME = "company-work-suite"
 PLUGIN_DIR = Path(__file__).parent
 SKILLS_DIR = PLUGIN_DIR / "skills"
+ROLE_ROUTING = """When using the Company Work Suite plugin, route work through role skills:
+- `cws-data-agent`: prepares and verifies prerequisite information.
+- `cws-gen-agent`: synthesizes prepared information into final deliverables.
+
+Use data first when facts or context are missing; use gen when producing the final answer."""
 
 
 def _skill_names() -> set[str]:
@@ -36,7 +42,7 @@ def _command_description(skill_md: Path, command: str) -> str:
     description = _frontmatter_value(skill_md, "description")
     if display and description:
         return f"{display}：{description}"
-    return description or display or f"Load NoeticAI skill {command}."
+    return description or display or f"Load Company Work Suite skill {command}."
 
 
 def _command_args_hint(skill_md: Path) -> str:
@@ -46,7 +52,7 @@ def _command_args_hint(skill_md: Path) -> str:
 def _skill_prompt(command: str, args: str = "") -> str:
     tail = args.strip()
     suffix = f"\n\nUser arguments: {tail}" if tail else ""
-    return f"Load and follow the Hermes plugin skill `{PLUGIN_NAME}:{command}`.{suffix}"
+    return f"Load and follow the Hermes plugin skill `{PLUGIN_NAME}:{command}`.\n\n{ROLE_ROUTING}{suffix}"
 
 
 def _slash_access_denied(event: Any, gateway: Any, command: str) -> bool:
@@ -86,13 +92,37 @@ def _make_skill_command_handler(ctx: Any, command: str) -> Callable[[str], str]:
     return handler
 
 
+def _ensure_hermes_mcp() -> None:
+    """Merge plugin MCP servers into ~/.hermes/config.yaml on load."""
+    try:
+        scripts_dir = PLUGIN_DIR / "scripts"
+        if str(scripts_dir) not in sys.path:
+            sys.path.insert(0, str(scripts_dir))
+        from ensure_hermes_mcp import ensure_hermes_mcp
+
+        ensure_hermes_mcp(plugin_root=PLUGIN_DIR)
+    except Exception:
+        pass
+
+
 def register(ctx):
+    _ensure_hermes_mcp()
+
     for child in sorted(SKILLS_DIR.iterdir() if SKILLS_DIR.exists() else []):
         skill_md = child / "SKILL.md"
         if child.is_dir() and skill_md.exists():
             ctx.register_skill(child.name, skill_md)
 
     ctx.register_hook("pre_gateway_dispatch", rewrite_gateway_command)
+    ctx.register_hook("pre_tool_call", _gate_before_kanban_complete)
+
+    if hasattr(ctx, "register_cli_command"):
+        ctx.register_cli_command(
+            name="cws-gate",
+            help="Retry or waive a blocked CWS Kanban gate",
+            setup_fn=_setup_gate_cli,
+            handler_fn=_run_gate_cli,
+        )
 
     for command in sorted(_skill_names()):
         skill_md = SKILLS_DIR / command / "SKILL.md"
@@ -102,3 +132,54 @@ def register(ctx):
             description=_command_description(skill_md, command),
             args_hint=_command_args_hint(skill_md),
         )
+
+
+def _gate_module():
+    scripts_dir = PLUGIN_DIR / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    import kanban_gate
+    return kanban_gate
+
+
+def _gate_before_kanban_complete(tool_name: str = "", args: Any = None, task_id: str = "", **_: Any):
+    if tool_name != "kanban_complete" or not task_id:
+        return None
+    try:
+        from hermes_cli import kanban_db
+        board = (args or {}).get("board") if isinstance(args, dict) else None
+        conn = kanban_db.connect(board=board)
+        try:
+            task = kanban_db.get_task(conn, task_id)
+        finally:
+            conn.close()
+        if task is None:
+            return None
+        result = _gate_module().gate_completion(task_id, task.body, board=board)
+        if result and result["status"] == "blocked":
+            return {"action": "block", "message": "CWS gate blocked completion: " + "; ".join(result["errors"]) + ". A human must run `hermes cws-gate retry` after repair or `hermes cws-gate waive --reason ...`."}
+    except Exception as exc:
+        return {"action": "block", "message": f"CWS gate failed closed: {exc}"}
+    return None
+
+
+def _setup_gate_cli(parser: Any) -> None:
+    parser.add_argument("action", choices=("retry", "waive"))
+    parser.add_argument("task_id")
+    parser.add_argument("--board")
+    parser.add_argument("--reason")
+
+
+def _run_gate_cli(args: Any) -> int:
+    from hermes_cli import kanban_db
+    conn = kanban_db.connect(board=args.board)
+    try:
+        task = kanban_db.get_task(conn, args.task_id)
+    finally:
+        conn.close()
+    if task is None:
+        raise ValueError(f"task not found: {args.task_id}")
+    gate = _gate_module()
+    result = gate.retry(args.task_id, task.body, board=args.board) if args.action == "retry" else gate.waive(args.task_id, task.body, args.reason or "", board=args.board)
+    print(json.dumps(result, ensure_ascii=False))
+    return 0

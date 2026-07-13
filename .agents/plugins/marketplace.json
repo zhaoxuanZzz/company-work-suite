@@ -1,8 +1,8 @@
 {
-  "name": "noeticai-local",
+  "name": "company-work-suite-local",
   "plugins": [
     {
-      "name": "noeticai-knowledge",
+      "name": "company-work-suite",
       "source": {
         "source": "local",
         "path": "."

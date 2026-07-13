@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate the NoeticAI plugin static contract."""
+"""Validate the Company Work Suite plugin static contract."""
 
 from __future__ import annotations
 
@@ -154,6 +154,7 @@ def validate_hermes(root: Path) -> list[str]:
     errors: list[str] = []
     plugin_yaml = root / "plugin.yaml"
     init_py = root / "__init__.py"
+    mcp_json = root / ".mcp.json"
 
     if not plugin_yaml.exists():
         errors.append(f"missing {plugin_yaml}")
@@ -164,6 +165,7 @@ def validate_hermes(root: Path) -> list[str]:
         for key in ("version", "description"):
             if not plugin.get(key):
                 errors.append(f"{plugin_yaml}: {key} is required")
+        errors.extend(validate_hermes_mcp(root, plugin_yaml, mcp_json))
 
     if not init_py.exists():
         errors.append(f"missing {init_py}")
@@ -191,11 +193,90 @@ def validate_hermes(root: Path) -> list[str]:
     return errors
 
 
+def validate_hermes_mcp(root: Path, plugin_yaml: Path, mcp_json: Path) -> list[str]:
+    errors: list[str] = []
+    scripts_dir = root / "scripts"
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    try:
+        from ensure_hermes_mcp import AUTH_VALUE, load_plugin_mcp_servers
+    except Exception as exc:
+        errors.append(f"{plugin_yaml}: unable to load ensure_hermes_mcp: {exc}")
+        return errors
+
+    try:
+        servers = load_plugin_mcp_servers(root)
+    except Exception as exc:
+        errors.append(f"{plugin_yaml}: invalid mcp_servers: {exc}")
+        return errors
+
+    if not servers:
+        errors.append(f"{plugin_yaml}: mcp_servers is required")
+        return errors
+
+    for name, cfg in servers.items():
+        url = cfg.get("url")
+        if not isinstance(url, str) or not url.strip():
+            errors.append(f"{plugin_yaml}: mcp_servers.{name}.url is required")
+        headers = cfg.get("headers")
+        if not isinstance(headers, dict):
+            errors.append(f"{plugin_yaml}: mcp_servers.{name}.headers is required")
+            continue
+        auth = headers.get("Authorization")
+        if not isinstance(auth, str) or "${QCC_MCP_TOKEN}" not in auth:
+            errors.append(
+                f"{plugin_yaml}: mcp_servers.{name}.headers.Authorization must include ${{QCC_MCP_TOKEN}}"
+            )
+        elif auth.strip() != AUTH_VALUE:
+            errors.append(
+                f"{plugin_yaml}: mcp_servers.{name}.headers.Authorization must be '{AUTH_VALUE}'"
+            )
+
+    if not mcp_json.exists():
+        errors.append(f"missing {mcp_json}")
+        return errors
+
+    companion = read_json(mcp_json, errors)
+    if not companion:
+        return errors
+    companion_servers = companion.get("mcpServers")
+    if not isinstance(companion_servers, dict):
+        errors.append(f"{mcp_json}: mcpServers must be an object")
+        return errors
+
+    if set(servers) != set(companion_servers):
+        errors.append(
+            f"{plugin_yaml}: mcp_servers names must match {mcp_json} mcpServers "
+            f"({sorted(servers)} != {sorted(companion_servers)})"
+        )
+    for name, cfg in servers.items():
+        companion_cfg = companion_servers.get(name)
+        if not isinstance(companion_cfg, dict):
+            continue
+        if cfg.get("url") != companion_cfg.get("url"):
+            errors.append(
+                f"{plugin_yaml}: mcp_servers.{name}.url must match {mcp_json} "
+                f"({cfg.get('url')!r} != {companion_cfg.get('url')!r})"
+            )
+    return errors
+
+
+def _load_card_gate():
+    scripts_dir = Path(__file__).resolve().parent
+    if str(scripts_dir) not in sys.path:
+        sys.path.insert(0, str(scripts_dir))
+    from card_gate import load_card, validate_card_gate
+
+    return load_card, validate_card_gate
+
+
 def validate_work_suite(root: Path) -> list[str]:
     errors: list[str] = []
     skills_dir = root / "skills"
     names = skill_names(root, errors)
+    load_card, validate_card_gate = _load_card_gate()
 
+    workflow_stages: dict[str, list[dict[str, object]]] = {}
     for workflow in sorted(skills_dir.glob("*/references/workflow.yaml")):
         try:
             stages = parse_workflow(workflow)
@@ -203,6 +284,7 @@ def validate_work_suite(root: Path) -> list[str]:
             errors.append(str(exc))
             continue
 
+        workflow_stages[workflow.parent.parent.name] = stages
         available_outputs: set[str] = set()
         for index, stage in enumerate(stages, 1):
             stage_id = stage["id"]
@@ -219,6 +301,21 @@ def validate_work_suite(root: Path) -> list[str]:
 
             if "skills" not in stage:
                 errors.append(f"{workflow}: stage {index} ({stage_id}): skills is required")
+
+    for card_path in sorted(skills_dir.glob("*/card.yaml")):
+        skill_id = card_path.parent.name
+        try:
+            card = load_card(card_path)
+        except Exception as exc:
+            errors.append(str(exc))
+            continue
+        errors.extend(
+            validate_card_gate(
+                card_path,
+                card=card,
+                stages=workflow_stages.get(skill_id),
+            )
+        )
 
     return errors
 
@@ -247,7 +344,34 @@ def write(path: Path, text: str = "") -> None:
 def make_suite(root: Path) -> None:
     write(root / ".codex-plugin" / "plugin.json", json.dumps({"name": root.name, "skills": "./skills/"}))
     write(root / ".claude-plugin" / "plugin.json", json.dumps({"name": root.name}))
-    write(root / "plugin.yaml", f"name: {root.name}\nversion: 0.1.0\ndescription: Test plugin\n")
+    write(
+        root / "plugin.yaml",
+        f"""name: {root.name}
+version: 0.1.0
+description: Test plugin
+mcp_servers:
+  qcc-company:
+    url: https://agent.qcc.com/mcp/company/stream
+    timeout: 120
+    connect_timeout: 30
+    headers:
+      Authorization: "Bearer ${{QCC_MCP_TOKEN}}"
+""",
+    )
+    write(
+        root / ".mcp.json",
+        json.dumps(
+            {
+                "mcpServers": {
+                    "qcc-company": {
+                        "type": "http",
+                        "url": "https://agent.qcc.com/mcp/company/stream",
+                    }
+                }
+            }
+        ),
+    )
+    write(root / "scripts" / "ensure_hermes_mcp.py", (Path(__file__).resolve().parent / "ensure_hermes_mcp.py").read_text(encoding="utf-8"))
     write(root / "__init__.py", "def register(ctx):\n    ctx.register_skill('research', 'skills/research/SKILL.md')\n")
     write(root / "skills" / "research" / "SKILL.md")
     write(
@@ -295,6 +419,75 @@ stages:
 """,
         )
         assert any("is not produced by a previous stage" in error for error in validate(bad_input))
+
+        ok_gate = base / "ok-gate"
+        make_suite(ok_gate)
+        write(
+            ok_gate / "skills" / "research" / "card.yaml",
+            """id: research
+outputs:
+  - context
+gate:
+  handoff: required
+  required_outputs:
+    - context
+  required_meta:
+    - subject
+  artifact_checks:
+    context:
+      type: object_or_string
+      non_empty: true
+  behavior_checks:
+    - id: no_fabricated_empty_fill
+""",
+        )
+        assert validate(ok_gate) == []
+
+        bad_gate = base / "bad-gate"
+        make_suite(bad_gate)
+        write(
+            bad_gate / "skills" / "research" / "card.yaml",
+            """id: research
+outputs:
+  - context
+gate:
+  handoff: required
+  required_outputs:
+    - missing_output
+""",
+        )
+        bad_errors = validate(bad_gate)
+        assert any("required_outputs must be subset" in error for error in bad_errors)
+
+        bad_meta = base / "bad-meta"
+        make_suite(bad_meta)
+        write(
+            bad_meta / "skills" / "research" / "card.yaml",
+            """id: research
+outputs:
+  - context
+gate:
+  handoff: required
+  required_meta:
+    - not_a_meta_field
+""",
+        )
+        assert any("required_meta not in whitelist" in error for error in validate(bad_meta))
+
+        bad_behavior = base / "bad-behavior"
+        make_suite(bad_behavior)
+        write(
+            bad_behavior / "skills" / "research" / "card.yaml",
+            """id: research
+outputs:
+  - context
+gate:
+  handoff: required
+  behavior_checks:
+    - id: unknown_behavior
+""",
+        )
+        assert any("unknown_behavior" in error for error in validate(bad_behavior))
 
     print("self-test ok")
     return 0

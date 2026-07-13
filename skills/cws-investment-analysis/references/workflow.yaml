@@ -1,0 +1,16 @@
+name: 投资分析
+stages:
+  - id: profile
+    skills: [cws-company-profile]
+    outputs: [company_profile]
+
+  - id: analysis
+    skills: [cws-shareholder-structure, cws-litigation-risk, cws-financing-history]
+    inputs: [company_profile]
+    parallel: true
+    outputs: [shareholder_structure, litigation_risk, financing_history]
+
+  - id: report
+    skills: [cws-investment-analysis]
+    inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
+    outputs: [investment_analysis_report]

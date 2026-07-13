@@ -1,0 +1,16 @@
+name: 企业尽调
+stages:
+  - id: profile
+    skills: [cws-company-profile]
+    outputs: [company_profile]
+
+  - id: analysis
+    skills: [cws-shareholder-structure, cws-litigation-risk, cws-financing-history]
+    inputs: [company_profile]
+    parallel: true
+    outputs: [shareholder_structure, litigation_risk, financing_history]
+
+  - id: report
+    skills: [cws-due-diligence]
+    inputs: [company_profile, shareholder_structure, litigation_risk, financing_history]
+    outputs: [due_diligence_report]

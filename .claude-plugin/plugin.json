@@ -1,8 +1,8 @@
 {
-  "name": "noeticai-knowledge",
+  "name": "company-work-suite",
   "version": "0.1.0",
-  "description": "NoeticAI enterprise knowledge-card skills for company research, due diligence, and investment analysis.",
+  "description": "Enterprise knowledge-card skills for company research, due diligence, and investment analysis.",
   "author": {
-    "name": "NoeticAI"
+    "name": "zhaoxuan"
   }
 }

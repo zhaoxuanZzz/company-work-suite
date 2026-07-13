@@ -1,6 +1,6 @@
-# NoeticAI Knowledge Cards Work Suite
+# Company Work Suite
 
-Cross-platform skills plugin for Hermes, Codex, Qoder, and compatible hosts. It organizes NoeticAI enterprise knowledge cards into atomic and workflow-backed skills.
+Cross-platform skills plugin for Hermes, Codex, Qoder, and compatible hosts. It organizes enterprise knowledge cards into atomic and workflow-backed skills.
 
 > **Disclaimer:** Outputs are for research and decision support only. They do not replace formal due diligence, legal opinions, or investment advice.
 
@@ -21,24 +21,24 @@ Business workflows live inside orchestrating skills as `references/workflow.yaml
 
 | Skill | Workflow |
 |----------|-------------|
-| 企业尽调 | [skills/noetic-due-diligence/references/workflow.yaml](./skills/noetic-due-diligence/references/workflow.yaml) |
-| 投资分析 | [skills/noetic-investment-analysis/references/workflow.yaml](./skills/noetic-investment-analysis/references/workflow.yaml) |
+| 企业尽调 | [skills/cws-due-diligence/references/workflow.yaml](./skills/cws-due-diligence/references/workflow.yaml) |
+| 投资分析 | [skills/cws-investment-analysis/references/workflow.yaml](./skills/cws-investment-analysis/references/workflow.yaml) |
 
 ## Company Data Lookup Strategy
 
 Each company business skill reads its own `card.yaml.data_needs`, checks the local company wiki first, then fills missing public company data as needed.
 
-The company knowledge base defaults to `~/.noeticai/company-knowledge` and can be overridden with `NOETICAI_COMPANY_KB_DIR`. Public lookup is used only when the wiki has no match, the company identity is uncertain, required fields are missing, or the matched data is clearly stale.
+The company knowledge base defaults to `~/.cws/company-knowledge` and can be overridden with `CWS_COMPANY_KB_DIR`. Public lookup is used only when the wiki has no match, the company identity is uncertain, required fields are missing, or the matched data is clearly stale.
 
-After lookup, the full result is stored as a raw source in the knowledge base `raw/`, then compiled into `wiki/` through the `noetic-karpathy-llm-wiki` Ingest flow. Each business skill reports the company wiki writeback status. This plugin stores capabilities and rules, not company data.
+After lookup, the full result is stored as a raw source in the knowledge base `raw/`, then compiled into `wiki/` through the `cws-karpathy-llm-wiki` Ingest flow. Each business skill reports the company wiki writeback status. This plugin stores capabilities and rules, not company data.
 
 ## Development
 
 Link this repo into the local plugin directory of Hermes or another compatible host for testing:
 
 ```bash
-ln -s /Users/zhaoxuan/code/noeticai-knowledge \
-  ~/plugins/noeticai-knowledge
+ln -s /Users/zhaoxuan/code/company-work-suite \
+  ~/plugins/company-work-suite
 ```
 
 Static validation:
@@ -47,7 +47,7 @@ Static validation:
 python3 scripts/validate_work_suite.py .
 ```
 
-See [docs/noeticai-knowledge-plugin-plan.md](./docs/noeticai-knowledge-plugin-plan.md) for the full migration plan.
+See [docs/company-work-suite-plugin-plan.md](./docs/company-work-suite-plugin-plan.md) for the full migration plan.
 
 ## Structure
 
