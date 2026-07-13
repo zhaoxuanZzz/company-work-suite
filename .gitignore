@@ -4,6 +4,7 @@
 .vscode/
 .env
 __pycache__/
+.secrets/
 graphify-out/
 .scratch/
 .graphify/
