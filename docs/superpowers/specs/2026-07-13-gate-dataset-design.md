@@ -39,7 +39,7 @@
 ### 2.3 非目标
 
 - 首批不覆盖所有业务 skill 和投资分析 workflow。
-- 不在数据集建设阶段直接实现 LLM 主观评分器。
+- 不使用纯 LLM 主观评分器作为唯一硬门禁。
 - 不把在线数据源的实时结果作为 CI 的通过条件。
 - 不自动接受在线刷新产生的新标签或新基准。
 - 不把受限原文、访问令牌、请求头或企业内部数据提交到仓库。
@@ -52,21 +52,21 @@
 
 | 字段 | 取值 | 含义 |
 | --- | --- | --- |
-| `expected_gate` | `passed` / `blocked` | 业务上期望的硬门禁结果 |
+| `expected_decision` | `passed` / `blocked` / `needs_review` | 业务上期望的门禁决策 |
 | `quality_state` | `complete` / `degraded` / `invalid` | 数据完整、真实但有缺口、或不可接受 |
 | `waivable` | `true` / `false` | 是否允许人工带原因放行 |
 | `expected_reasons` | 字符串列表 | 稳定、机器可比较的原因码 |
 
-`degraded` 不等于失败。无法取得部分数据但已在 `evidence_gaps` 中如实披露时，`expected_gate` 可以是 `passed`。主体无法确认、来源冲突未披露、虚构结论或混入其他任务数据时，`expected_gate` 必须是 `blocked`。
+`degraded` 不等于失败。无法取得部分数据但已在 `evidence_gaps` 中如实披露时，`expected_decision` 可以是 `passed`。主体无法确认、确定性证据规则失败、虚构结论或混入其他任务数据时，`expected_decision` 必须是 `blocked`。只有 LLM Judge 发现语义可疑或自身置信度不足、但确定性规则没有证明产物错误时，才使用 `needs_review`。
 
 数据集还必须记录当前实现的实际结果：
 
 ```json
 {
-  "expected_gate": "blocked",
+  "expected_decision": "needs_review",
   "quality_state": "invalid",
   "expected_reasons": ["source_conflict_not_disclosed"],
-  "current_gate_decision": "passed",
+  "current_decision": "passed",
   "capability_gap": true,
   "waivable": true
 }
@@ -74,7 +74,117 @@
 
 这样可以保留已知失败案例，而不把当前误放行错误地固化为业务预期。
 
-## 4. 方案选择
+## 4. 语义识别架构
+
+数据集提供人工审核后的标准答案，但数据集本身不是语义检查器。运行时采用混合式 evaluator：确定性证据规则负责可以机械证明的错误，LLM Judge 负责自然语言中的曲解、遗漏与隐瞒。
+
+这里的“虚构”定义为：**某项结论无法被本次运行冻结的证据集合支持，或与该证据集合直接冲突**。Gate 不能证明现实世界的绝对真伪；如果所有上游来源本身都错误，只能通过来源治理和人工复核处理。
+
+### 4.1 Claim-level 证据契约
+
+语义 gate 仍以业务 skill 的 `card.yaml` 为单一事实来源。建议在现有 `gate` 下增加版本化、可静态校验的 `semantic` 段：
+
+```yaml
+gate:
+  handoff: required
+  semantic:
+    evidence: required
+    deterministic_checks:
+      - claim_evidence
+      - subject_identity
+      - freshness_disclosure
+      - source_conflict_disclosure
+      - negative_claim_coverage
+    judge:
+      rubric: company-profile-v1
+      on_suspicious: needs_review
+```
+
+`deterministic_checks` 和 `rubric` 都必须引用仓库内注册的白名单 ID，不能在 `card.yaml` 中放任意可执行表达式或自由文本 prompt。时效阈值按字段类型配置在注册的检查器策略中并带版本号，不能依赖测试当天的隐式默认值。
+
+每个有语义 gate 的节点除 `handoff.json` 外，还必须生成同目录的 `evidence.json`。它不替代业务 artifact，而是记录 artifact 中每项关键结论如何追溯到冻结来源：
+
+```json
+{
+  "run_id": "run-case-001",
+  "skill_id": "cws-company-profile",
+  "subject": {
+    "name": "示例公司",
+    "unified_social_credit_code": "91330100TEST000001"
+  },
+  "evidence": [{
+    "id": "e1",
+    "subject_id": "91330100TEST000001",
+    "field": "operating_status",
+    "value": "存续",
+    "observed_at": "2026-07-13",
+    "source_ref": "raw/qcc-company.json#/result/status"
+  }],
+  "claims": [{
+    "artifact_path": "artifacts.operating_status.status",
+    "value": "存续",
+    "evidence_refs": ["e1"]
+  }],
+  "conflicts": []
+}
+```
+
+关键结论必须有 claim；claim 必须引用存在的 evidence；evidence 必须能定位到冻结 raw 快照中的具体字段。不能只在 handoff 顶层笼统列一个 `sources` 数组来证明所有结论。
+
+`source_ref` 只能引用 company-kb 或案例 bundle 内的冻结文件，解析后不得逃逸允许的根目录。Evaluator 同时校验案例记录的来源摘要哈希，避免评估时原始证据被替换。
+
+### 4.2 确定性语义规则
+
+以下规则失败时直接返回 `blocked`：
+
+- claim 引用的 evidence 不存在或来源路径不可解析。
+- claim 值与 evidence 值归一化后不一致。
+- evidence 主体与本次目标主体的统一社会信用代码不一致。
+- 数据超过对应类型的时效阈值，且未进入 `evidence_gaps`。
+- 来源存在结构化冲突，但 `conflicts` 或 `evidence_gaps` 未披露。
+- “无诉讼”“无风险”等否定结论没有对应范围完整、执行成功的查询证据。
+- final 产物引用其他 run、其他主体或未通过 gate 的父产物。
+- final 报告新增父产物和证据集合中不存在的确定性事实。
+
+### 4.3 LLM Judge
+
+LLM Judge 只读取冻结的 raw 摘要、`evidence.json`、`handoff.json`、父 handoff 和最终报告，不访问实时网络。它使用固定 rubric 检查：
+
+- 自然语言是否曲解结构化证据。
+- 是否隐瞒来源冲突、数据时效或关键 `evidence_gaps`。
+- final 报告是否遗漏父节点披露的重大风险。
+- 建议和风险级别是否超出已有事实能够支持的范围。
+
+Judge 必须输出结构化结果：`decision`、`confidence`、稳定原因码、artifact 路径和 evidence 引用。无法给出具体路径和引用的判断无效。结果还必须记录 evaluator ID、rubric 版本和模型标识，以便同一数据集比较不同 Judge 版本。
+
+```json
+{
+  "decision": "needs_review",
+  "confidence": 0.71,
+  "evaluator_id": "company-profile-semantic-v1",
+  "rubric_version": "company-profile-v1",
+  "model": "configured-model-id",
+  "findings": [{
+    "reason": "source_conflict_not_disclosed",
+    "artifact_path": "artifacts.company_summary.status",
+    "evidence_refs": ["e1", "e2"]
+  }]
+}
+```
+
+### 4.4 运行状态与人工介入
+
+首期使用“软判定、硬暂停”：
+
+| 条件 | 结果 | 后续动作 |
+| --- | --- | --- |
+| 确定性规则失败 | `blocked` | 修复产物后重试，或按既有权限带原因豁免 |
+| 确定性规则通过，LLM Judge 通过 | `passed` | 允许完成和交接 |
+| LLM Judge 判为可疑或置信度不足 | `needs_review` | 暂停完成，等待人工修复重试或带原因豁免 |
+
+LLM Judge 不能单独永久判死任务，也不能在可疑时自动放行。运行时可将 `needs_review` 映射为 Kanban blocked 状态，但 gate result 必须保留独立的 `needs_review` 语义，便于审计和统计。
+
+## 5. 方案选择
 
 考虑过三种组织方式：
 
@@ -84,7 +194,7 @@
 
 采用第三种。它兼顾真实场景的可审计性和契约测试的低维护成本。
 
-## 5. 数据集目录
+## 6. 数据集目录
 
 ```text
 tests/fixtures/gate-dataset/
@@ -111,7 +221,7 @@ tests/fixtures/gate-dataset/
 
 `schema/` 只表达确定性契约变体。`business/` 表达真实业务语义。`manifests/` 是测试发现和期望判定的入口。`refresh/companies.json` 只保存允许在线刷新的主体标识、场景用途和刷新频率，不保存密钥。
 
-## 6. 真实案例 bundle
+## 7. 真实案例 bundle
 
 每个业务案例是一个可独立回放的 bundle：
 
@@ -126,6 +236,7 @@ business/conflicting-sources/
 │   └── run-case-001/
 │       ├── cws-company-profile/
 │       │   ├── handoff.json
+│       │   ├── evidence.json
 │       │   └── report.md
 │       └── cws-due-diligence/
 │           └── handoff.json
@@ -138,6 +249,7 @@ business/conflicting-sources/
 - `raw/`：冻结且最小化的原始来源数据。
 - `input.json`：输入主体、统一社会信用代码（如有）、模拟运行时间和固定 `run_id`。
 - `artifacts/`：待 gate 回放的标准化产物。
+- `evidence.json`：关键结论到冻结来源字段的 claim-level 证据映射。
 - `case.json`：场景标签、快照时间、适用 gate 和数据来源摘要。
 - `expected/decision.json`：业务期望、当前实际结果和能力缺口。
 
@@ -160,11 +272,11 @@ business/conflicting-sources/
 
 `snapshot_at` 表示抓取时间；`evaluation_at` 表示回放时模拟的当前时间。两者分开后，可以稳定复现“数据已过期”场景，而不依赖测试执行当天的系统时间。
 
-## 7. 首批场景矩阵
+## 8. 首批场景矩阵
 
-### 7.1 Node gate
+### 8.1 Node gate
 
-| 类别 | 场景 | `expected_gate` | `quality_state` |
+| 类别 | 场景 | `expected_decision` | `quality_state` |
 | --- | --- | --- | --- |
 | 基线 | 主体唯一、数据完整、来源一致 | `passed` | `complete` |
 | 主体 | 公司简称能唯一解析到法人主体 | `passed` | `complete` |
@@ -176,7 +288,8 @@ business/conflicting-sources/
 | 空数据 | 查不到数据却填充确定性结论 | `blocked` | `invalid` |
 | 来源 | 多来源结论一致 | `passed` | `complete` |
 | 来源 | 多来源冲突，已披露冲突和取舍依据 | `passed` | `degraded` |
-| 来源 | 多来源冲突，直接选择其一且不说明 | `blocked` | `invalid` |
+| 来源 | 多来源冲突，确定性字段可证明未披露 | `blocked` | `invalid` |
+| 来源 | 多来源冲突只存在于自然语言语义中，疑似未披露 | `needs_review` | `invalid` |
 | 时效 | 数据较旧，明确标注时间和时效风险 | `passed` | `degraded` |
 | 时效 | 使用过期数据却声明为当前状态 | `blocked` | `invalid` |
 | 状态 | 注销、吊销或经营异常，风险如实进入 `risk_flags` | `passed` | `complete` |
@@ -184,20 +297,21 @@ business/conflicting-sources/
 | 文件 | handoff 缺失、JSON 损坏或根节点类型错误 | `blocked` | `invalid` |
 | 隔离 | handoff `run_id` 与本次运行不一致 | `blocked` | `invalid` |
 
-### 7.2 Final gate
+### 8.2 Final gate
 
-| 场景 | `expected_gate` | `quality_state` |
+| 场景 | `expected_decision` | `quality_state` |
 | --- | --- | --- |
 | 父 handoff 和报告齐全，来自同一 run 和同一主体 | `passed` | `complete` |
 | 任一父 handoff 缺失或损坏 | `blocked` | `invalid` |
 | 混入其他 run 的父产物 | `blocked` | `invalid` |
 | 混入另一家公司的父产物 | `blocked` | `invalid` |
 | 父节点结构合格，但其 gate 实际被阻断 | `blocked` | `invalid` |
-| 报告遗漏父节点披露的重大风险或关键缺口 | `blocked` | `invalid` |
+| 报告可确定地混入父证据中不存在的新事实 | `blocked` | `invalid` |
+| LLM Judge 判断报告可能遗漏重大风险或关键缺口 | `needs_review` | `invalid` |
 
 首批案例应覆盖每一行至少一个样本。结构型案例可由 patch 生成；主体、来源、时效和报告遗漏必须使用完整业务 bundle。
 
-## 8. 原因码
+## 9. 原因码
 
 原因码用于稳定断言，不直接依赖易变化的中文错误文本。首批至少包括：
 
@@ -213,17 +327,23 @@ missing_data_not_disclosed
 unsupported_claim
 source_conflict_not_disclosed
 stale_data_not_disclosed
+evidence_missing
+evidence_path_invalid
+evidence_value_mismatch
+evidence_subject_mismatch
+negative_claim_without_search_coverage
 data_role_contains_final_report
 parent_handoff_missing
 parent_gate_blocked
 cross_run_artifact
 cross_subject_artifact
 material_risk_omitted
+judge_low_confidence
 ```
 
 一个案例可以有多个原因码。测试断言至少要求实际原因集合包含 `expected_reasons`，允许检查器附加更具体的诊断信息。
 
-## 9. 离线评估
+## 10. 离线评估
 
 离线 runner 的职责是：
 
@@ -231,14 +351,17 @@ material_risk_omitted
 2. 为结构案例复制基准 handoff 并应用 patch。
 3. 为业务案例构造隔离的临时 company-kb 目录。
 4. 使用案例固定的 `run_id` 调用现有 node 或 final gate。
-5. 记录 `expected_gate`、实际 exit code、标准化原因码和能力缺口。
-6. 输出 JSON 明细与终端摘要。
+5. 先运行确定性 evaluator，再按案例配置运行固定版本的 LLM Judge。
+6. 记录 `expected_decision`、实际决策、标准化原因码、Judge 版本和能力缺口。
+7. 输出 JSON 明细与终端摘要。
 
 指标至少包含：
 
 - 总案例数与按标签覆盖率。
 - 误放行：预期拦截但实际通过。
 - 误拦截：预期通过但实际拦截。
+- 待复核命中率：预期 `needs_review` 且实际正确暂停。
+- Judge 误报与漏报：以人工审核标签为准。
 - 已知能力缺口：`capability_gap: true` 的案例。
 - 非预期回归：原本一致的案例产生新偏差。
 
@@ -248,7 +371,7 @@ CI 分层执行：
 - 定期评估：同一离线基准集的完整报告，可容纳已登记的能力缺口，但不能新增未登记偏差。
 - 在线刷新：独立任务，不作为普通 PR 的通过条件。
 
-## 10. 在线刷新
+## 11. 在线刷新
 
 在线刷新遵循以下流程：
 
@@ -274,7 +397,7 @@ CI 分层执行：
 - 语义标签必须人工审核；刷新脚本只能提出候选变化。
 - 基准更新应在 PR 中同时展示来源 diff、handoff diff、gate 决策 diff 和标签变化。
 
-## 11. 当前能力缺口的处理
+## 12. 当前能力缺口的处理
 
 数据集先表达正确业务期望，不迁就当前检查器能力。预期会首先暴露以下误放行：
 
@@ -284,10 +407,12 @@ CI 分层执行：
 - 父 handoff 属于同一 run，但实际是另一家公司。
 - final 报告遗漏父节点的重大风险或 `evidence_gaps`。
 - final 只检查父 handoff 存在，却没有验证父 gate 是否通过。
+- handoff 缺少 claim-level evidence，无法确定性判断结论是否有来源支持。
+- 当前没有固定 rubric、结构化输出和版本锁定的 LLM Judge。
 
 这些案例标记为 `capability_gap: true`。后续增强 gate 时逐项转为普通回归案例；不能删除失败样本来提高通过率。
 
-## 12. 分阶段落地
+## 13. 分阶段落地
 
 ### 阶段一：数据集骨架与现有规则回归
 
@@ -302,23 +427,38 @@ CI 分层执行：
 - 人工标注业务期望和原因码。
 - 生成首次误放行与误拦截报告。
 
-### 阶段三：在线刷新与漂移报告
+### 阶段三：确定性语义 evaluator
+
+- 增加 `evidence.json` 契约与静态校验。
+- 实现 claim、主体、值、时效、冲突和否定结论覆盖检查。
+- node 与 final 的确定性失败进入硬 `blocked`。
+
+### 阶段四：LLM Judge 与人工复核
+
+- 固定 rubric、模型配置、输出 schema 和 evaluator 版本。
+- LLM 可疑或低置信度结果进入 `needs_review`。
+- 接通人工修复重试和带原因豁免审计。
+
+### 阶段五：在线刷新与漂移报告
 
 - 配置刷新主体和频率。
 - 输出 staging 快照与多层 diff。
 - 建立人工提升基准的 PR 流程。
 
-### 阶段四：扩大覆盖
+### 阶段六：扩大覆盖
 
 - 按能力缺口优先级增强 gate。
 - 扩展到股权结构、司法风险、融资历史和投资分析。
 - 保持 node 与 final 案例分层，不把所有场景塞进单一端到端测试。
 
-## 13. 验收标准
+## 14. 验收标准
 
 - 首批场景矩阵每一行至少有一个案例。
-- 所有案例均有稳定 `case_id`、标签、预期 gate、质量状态和原因码。
+- 所有案例均有稳定 `case_id`、标签、预期决策、质量状态和原因码。
 - 离线执行不访问网络，结果可重复。
+- 关键结论可以通过 `evidence.json` 追溯到冻结 raw 字段。
+- 确定性语义失败稳定返回 `blocked`；LLM 可疑或低置信度结果稳定返回 `needs_review`。
+- Judge 输出包含 evaluator 版本、原因码、artifact 路径和 evidence 引用。
 - 当前已有结构规则全部通过回归。
 - 当前语义能力缺口被明确列出，且不会导致普通回归被误判为成功。
 - 在线刷新不能直接修改基准；基准提升需要人工审核。
